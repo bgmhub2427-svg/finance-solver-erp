@@ -143,6 +143,7 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       if (paymentsRes.data) {
         setPayments(paymentsRes.data.map((p: any) => ({
           id: p.id,
+          paymentId: p.payment_id || p.id,
           financialYear: p.financial_year,
           date: p.date,
           clientId: p.client_id,
@@ -302,7 +303,11 @@ export function ERPProvider({ children }: { children: ReactNode }) {
   const safeHandlerCode = role === 'handler' ? handlerCode : payment.handlerCode;
   const pending = Math.max(0, payment.dueAmount - payment.payment);
 
+  // Generate unique payment_id for traceability
+  const payment_id = 'PAY-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
   const { data, error } = await miniDB.from('payments').insert({
+    payment_id,
     financial_year: payment.financialYear,
     date: payment.date,
     client_id: payment.clientId,
@@ -520,23 +525,7 @@ export function useERP() {
   return ctx;
 }
 
-export const resetERPDatabase = () => {
-
-  const resetData = {
-    clients: [],
-    payments: [],
-    invoices: [],
-    pendingChecklist: [],
-    reports: [],
-    uploads: [],
-    approvals: [],
-    auditLogs: [],
-    collections: [],
-    riskDetection: [],
-    aiPlanner: [],
-    excelSync: []
-  };
-
-  localStorage.setItem("erp-data", JSON.stringify(resetData));
-
+export const resetERPDatabase = async () => {
+  const { resetDB } = await import('@/lib/mini-supabase');
+  await resetDB();
 };

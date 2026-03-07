@@ -344,6 +344,7 @@ playSuccess();
         <table className="erp-table">
           <thead>
             <tr>
+              <th>Payment ID</th>
               <th>Date</th>
               <th>Client ID</th>
               <th>Client Name</th>
@@ -360,11 +361,11 @@ playSuccess();
           </thead>
           <tbody>
             {fyPayments.length === 0 && (
-              <tr><td colSpan={isViewer ? 11 : 12} className="text-center py-8 text-muted-foreground text-sm">No payments recorded yet.</td></tr>
+              <tr><td colSpan={isViewer ? 12 : 13} className="text-center py-8 text-muted-foreground text-sm">No payments recorded yet.</td></tr>
             )}
             {fyPayments.map(p => (
               <tr key={p.id}>
-                <td className="erp-mono text-xs">{p.id}</td>
+                <td className="erp-mono text-xs text-primary font-semibold">{(p as any).paymentId || p.id}</td>
                 <td className="erp-mono text-xs">{p.date}</td>
                 <td className="erp-mono text-xs">{p.clientId}</td>
                 <td className="text-xs font-medium">{p.clientName}</td>
