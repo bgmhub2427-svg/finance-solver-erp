@@ -4,17 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 
-function AppRouter() {
-  return (
-    <HashRouter>
-      <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/" element={<Navigate to="/auth" />} />
-      </Routes>
-    </HashRouter>
-  );
-}
 import type { ReactNode } from "react";
 import { ERPProvider } from "@/lib/erp-store";
 import { useDailyReportAutoSave } from "@/hooks/useDailyReportAutoSave";
