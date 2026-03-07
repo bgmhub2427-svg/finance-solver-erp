@@ -18,16 +18,20 @@ export async function resetDB() {
     clients: [],
     payments: [],
     invoices: [],
-    pending_checklist: [],
+    invoice_items: [],
+    income: [],
+    expenses: [],
     audit_logs: [],
-    approvals: [],
-    collections: [],
-    risk_detection: [],
-    ai_planner: [],
-    excel_sync: []
+    fee_types: [],
+    client_fees: [],
+    upload_batches: [],
+    raw_json_logs: [],
+    client_lifecycle: [],
+    month_locks: [],
+    fraud_alerts: [],
   };
 
-  await saveDB(newDB);
+  await saveDB(newDB as any);
 
 }
 

@@ -111,7 +111,6 @@ try {
       : '';
 
     await addPayment({
-      id: paymentId,
       ...form,
       payment: computedPayment,
       dueAmount: form.dueAmount,
