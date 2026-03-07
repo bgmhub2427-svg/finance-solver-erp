@@ -344,6 +344,7 @@ playSuccess();
         <table className="erp-table">
           <thead>
             <tr>
+              <th>Payment ID</th>
               <th>Date</th>
               <th>Client ID</th>
               <th>Client Name</th>
