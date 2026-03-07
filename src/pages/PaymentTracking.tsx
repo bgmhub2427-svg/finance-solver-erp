@@ -361,7 +361,7 @@ playSuccess();
           </thead>
           <tbody>
             {fyPayments.length === 0 && (
-              <tr><td colSpan={isViewer ? 11 : 12} className="text-center py-8 text-muted-foreground text-sm">No payments recorded yet.</td></tr>
+              <tr><td colSpan={isViewer ? 12 : 13} className="text-center py-8 text-muted-foreground text-sm">No payments recorded yet.</td></tr>
             )}
             {fyPayments.map(p => (
               <tr key={p.id}>

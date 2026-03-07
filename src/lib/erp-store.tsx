@@ -525,23 +525,7 @@ export function useERP() {
   return ctx;
 }
 
-export const resetERPDatabase = () => {
-
-  const resetData = {
-    clients: [],
-    payments: [],
-    invoices: [],
-    pendingChecklist: [],
-    reports: [],
-    uploads: [],
-    approvals: [],
-    auditLogs: [],
-    collections: [],
-    riskDetection: [],
-    aiPlanner: [],
-    excelSync: []
-  };
-
-  localStorage.setItem("erp-data", JSON.stringify(resetData));
-
+export const resetERPDatabase = async () => {
+  const { resetDB } = await import('@/lib/mini-supabase');
+  await resetDB();
 };
