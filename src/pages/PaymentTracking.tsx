@@ -365,7 +365,7 @@ playSuccess();
             )}
             {fyPayments.map(p => (
               <tr key={p.id}>
-                <td className="erp-mono text-xs">{p.id}</td>
+                <td className="erp-mono text-xs text-primary font-semibold">{(p as any).paymentId || p.id}</td>
                 <td className="erp-mono text-xs">{p.date}</td>
                 <td className="erp-mono text-xs">{p.clientId}</td>
                 <td className="text-xs font-medium">{p.clientName}</td>
