@@ -302,7 +302,11 @@ export function ERPProvider({ children }: { children: ReactNode }) {
   const safeHandlerCode = role === 'handler' ? handlerCode : payment.handlerCode;
   const pending = Math.max(0, payment.dueAmount - payment.payment);
 
+  // Generate unique payment_id for traceability
+  const payment_id = 'PAY-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
   const { data, error } = await miniDB.from('payments').insert({
+    payment_id,
     financial_year: payment.financialYear,
     date: payment.date,
     client_id: payment.clientId,
