@@ -143,6 +143,7 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       if (paymentsRes.data) {
         setPayments(paymentsRes.data.map((p: any) => ({
           id: p.id,
+          paymentId: p.payment_id || p.id,
           financialYear: p.financial_year,
           date: p.date,
           clientId: p.client_id,
