@@ -428,7 +428,7 @@ describe('Mini-Supabase Core', () => {
   describe('Audit Logging', () => {
     it('should log sign-in events', async () => {
       await resetDB();
-      await miniAuth.signIn('admin@ka.com', 'Ka@2026');
+      await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
       
       const db = await loadDB();
       const loginLogs = db.audit_logs.filter((l: any) => l.action === 'login');
