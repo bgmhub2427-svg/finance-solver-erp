@@ -69,8 +69,10 @@ export default function InvoiceManager() {
       });
       setForm({ invoiceNo: '', date: new Date().toISOString().split('T')[0], clientId: '', description: 'Professional Services', amount: 0, servicePeriodFrom: 'April', servicePeriodTo: 'March' });
       setOpen(false);
+      playSuccess();
       toast({ title: 'Invoice generated successfully' });
     } catch (err: any) {
+      playError();
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
