@@ -13,6 +13,7 @@ export interface MiniUser {
   password: string;
   role: UserRole;
   handler_id: string | null;
+  org_id?: string | null;
 }
 
 export interface ERPDatabase {
@@ -34,7 +35,6 @@ export interface ERPDatabase {
   fraud_alerts: Record<string, any>[];
 }
 
-// Admin email list — any email here gets admin role on signup
 const ADMIN_EMAILS = [
   'admin@ka.com',
   'suneelkumarkota@admin.com',
@@ -49,7 +49,6 @@ export function isAdminEmail(email: string): boolean {
 
 const uid = () => (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
 
-// ── In-memory caches ────────────────────────────────────────────────
 let memGlobal: GlobalData | null = null;
 let memFY: { fy: string; data: FYData } | null = null;
 
@@ -68,11 +67,11 @@ const FY_FIELDS: (keyof ERPDatabase)[] = [
 function defaultGlobal(): GlobalData {
   return {
     users: [
-      { id: uid(), email: 'admin@ka.com', password: 'Ka@2026', role: 'admin', handler_id: null },
-      { id: uid(), email: 'suneelkumarkota@admin.com', password: 'KA@SKK@fee.123', role: 'admin', handler_id: null },
-      { id: uid(), email: 'saikarthikkota@admin.com', password: 'KA@SKBSK@fee.123', role: 'admin', handler_id: null },
-      { id: uid(), email: 'jana@admin.com', password: 'KA@JA@fee.123', role: 'admin', handler_id: null },
-      { id: uid(), email: 'manohar@admin.com', password: 'KA@M@fee.123', role: 'admin', handler_id: null },
+      { id: uid(), email: 'admin@ka.com', password: 'Ka@2026!x', role: 'admin', handler_id: null, org_id: 'default' },
+      { id: uid(), email: 'suneelkumarkota@admin.com', password: 'KA@SKK@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
+      { id: uid(), email: 'saikarthikkota@admin.com', password: 'KA@SKBSK@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
+      { id: uid(), email: 'jana@admin.com', password: 'KA@JA@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
+      { id: uid(), email: 'manohar@admin.com', password: 'KA@M@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
     ],
     handlers: [],
     audit_logs: [],
@@ -107,14 +106,14 @@ function ensureGlobalFields(g: any): GlobalData {
   for (const key of GLOBAL_FIELDS) {
     if (!Array.isArray(merged[key])) merged[key] = (defaults as any)[key];
   }
-  // Ensure all admin accounts exist
   const existingEmails = new Set((merged.users as MiniUser[]).map(u => u.email.toLowerCase()));
   for (const du of defaults.users) {
     if (!existingEmails.has(du.email.toLowerCase())) merged.users.push(du);
   }
-  // Ensure admin emails have admin role
   for (const user of merged.users as MiniUser[]) {
     if (isAdminEmail(user.email) && user.role !== 'admin') user.role = 'admin';
+    // Ensure legacy users have org_id
+    if (!user.org_id && isAdminEmail(user.email)) user.org_id = 'default';
   }
   return merged as GlobalData;
 }
@@ -136,20 +135,15 @@ function splitDB(db: ERPDatabase): { global: GlobalData; fyData: FYData } {
   return { global: global as GlobalData, fyData: fyData as FYData };
 }
 
-// ── Load / Save ─────────────────────────────────────────────────────
-
 export async function loadDB(): Promise<ERPDatabase> {
   const fy = getActiveFY();
 
-  // Return cached if available and same FY
   if (memGlobal && memFY && memFY.fy === fy) {
     return clone({ ...memGlobal, ...memFY.data } as ERPDatabase);
   }
 
-  // Load global
   let global = await loadGlobalData();
   if (!global) {
-    // Try legacy migration
     const legacy = await loadLegacyDatabase();
     if (legacy) {
       const split = splitDB(legacy as ERPDatabase);
@@ -165,7 +159,6 @@ export async function loadDB(): Promise<ERPDatabase> {
   }
   global = ensureGlobalFields(global);
 
-  // Load FY data
   let fyData = await loadFYData(fy);
   if (!fyData) {
     fyData = defaultFYData();
@@ -176,7 +169,6 @@ export async function loadDB(): Promise<ERPDatabase> {
   memGlobal = global;
   memFY = { fy, data: fyData };
 
-  // Ensure FY is in list
   const fys = getAvailableFYs();
   if (!fys.includes(fy)) {
     fys.push(fy);
@@ -210,18 +202,14 @@ export function genId() {
   return uid();
 }
 
-// ── FY Management ───────────────────────────────────────────────────
-
 export { getActiveFY, getAvailableFYs, setAvailableFYs };
 
 export function switchFY(fy: string) {
   setActiveFYStorage(fy);
-  // Invalidate FY cache so next loadDB fetches correct data
   memFY = null;
 }
 
 export async function createFinancialYear(newFY: string, carryForward: boolean = true): Promise<void> {
-  // Check if FY already exists
   const existing = await loadFYData(newFY);
   if (existing && existing.clients && existing.clients.length > 0) {
     throw new Error(`Financial Year ${newFY} already has data`);
@@ -231,7 +219,6 @@ export async function createFinancialYear(newFY: string, carryForward: boolean =
   let newFYData = defaultFYData();
 
   if (carryForward) {
-    // Load current FY data to carry forward clients
     const currentData = await loadFYData(currentFY);
     if (currentData && currentData.clients) {
       newFYData.clients = currentData.clients
@@ -240,9 +227,7 @@ export async function createFinancialYear(newFY: string, carryForward: boolean =
           ...c,
           id: uid(),
           financial_year: newFY,
-          // Carry forward pending as previous year pending
           previous_year_pending: Number(c.total_pending || 0),
-          // Old fee becomes the new fee from previous year
           old_fee: Number(c.new_fee || c.old_fee || 0),
           old_fee_end_month: 'March',
           old_fee_due: 0,
@@ -250,7 +235,7 @@ export async function createFinancialYear(newFY: string, carryForward: boolean =
           new_fee_start_month: 'April',
           new_fee_due: 0,
           total_paid_fy: 0,
-          total_pending: Number(c.total_pending || 0), // Carry forward pending
+          total_pending: Number(c.total_pending || 0),
           paid_term: '',
           created_at: new Date().toISOString(),
         }));
@@ -259,7 +244,6 @@ export async function createFinancialYear(newFY: string, carryForward: boolean =
 
   await saveFYData(newFY, newFYData);
 
-  // Add to FY list
   const fys = getAvailableFYs();
   if (!fys.includes(newFY)) {
     fys.push(newFY);
@@ -272,13 +256,11 @@ export async function deleteFinancialYear(fy: string): Promise<void> {
   const fys = getAvailableFYs();
   if (fys.length <= 1) throw new Error('Cannot delete the only financial year');
   
-  // Save empty data (effectively deleting)
   await saveFYData(fy, defaultFYData());
   
   const newFYs = fys.filter(f => f !== fy);
   setAvailableFYs(newFYs);
   
-  // If active FY was deleted, switch to the latest
   if (getActiveFY() === fy) {
     const latest = newFYs[newFYs.length - 1];
     switchFY(latest);
