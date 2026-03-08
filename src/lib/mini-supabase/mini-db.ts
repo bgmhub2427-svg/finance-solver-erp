@@ -35,16 +35,11 @@ export interface ERPDatabase {
   fraud_alerts: Record<string, any>[];
 }
 
-const ADMIN_EMAILS = [
-  'admin@ka.com',
-  'suneelkumarkota@admin.com',
-  'saikarthikkota@admin.com',
-  'jana@admin.com',
-  'manohar@admin.com',
-];
+// Admin emails are now dynamic per-organization — no hardcoded list
+const ADMIN_EMAILS: string[] = [];
 
-export function isAdminEmail(email: string): boolean {
-  return ADMIN_EMAILS.includes(email.toLowerCase());
+export function isAdminEmail(_email: string): boolean {
+  return false; // No hardcoded admins — roles are assigned during org setup
 }
 
 const uid = () => (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
