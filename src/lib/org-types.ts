@@ -16,6 +16,15 @@ export interface OrgConfig {
   roles: string[];
   payment_structure: string;
   enabled_modules: string[];
+  role_limits: RoleLimits;
+}
+
+export interface RoleLimits {
+  admin: number;
+  manager: number;
+  handler: number;
+  viewer: number;
+  fee_collector: number;
 }
 
 export interface ModuleDef {
