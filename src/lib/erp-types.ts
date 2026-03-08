@@ -75,11 +75,16 @@ export const HANDLERS: Handler[] = [
   
 ];
 
-export const FINANCIAL_YEARS = [
+// Dynamic FY list — will be populated from storage
+// Default static list as fallback
+export const DEFAULT_FINANCIAL_YEARS = [
   '2024-2025',
   '2025-2026',
   '2026-2027',
 ];
+
+// Keep for backward compat — components should use getAvailableFYs() instead
+export const FINANCIAL_YEARS = DEFAULT_FINANCIAL_YEARS;
 
 export const MONTHS = [
   'April', 'May', 'June', 'July', 'August', 'September',
