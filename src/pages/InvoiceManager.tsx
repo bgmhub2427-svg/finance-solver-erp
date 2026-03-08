@@ -9,6 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
+import { playClick, playSuccess, playError } from '@/lib/sound-engine';
 
 function formatCurrency(n: number) {
   return '₹' + n.toLocaleString('en-IN');
@@ -69,8 +70,10 @@ export default function InvoiceManager() {
       });
       setForm({ invoiceNo: '', date: new Date().toISOString().split('T')[0], clientId: '', description: 'Professional Services', amount: 0, servicePeriodFrom: 'April', servicePeriodTo: 'March' });
       setOpen(false);
+      playSuccess();
       toast({ title: 'Invoice generated successfully' });
     } catch (err: any) {
+      playError();
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
@@ -124,7 +127,7 @@ export default function InvoiceManager() {
           <p className="text-xs text-muted-foreground mt-0.5">{fyInvoices.length} Invoices — FY {currentFY} — No GST</p>
         </div>
         {!isViewer && (
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) playClick(); }}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1"><Plus className="w-3.5 h-3.5" /> Generate Invoice</Button>
             </DialogTrigger>

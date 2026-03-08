@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { miniDB, resetDB, loadDB, saveDB } from '@/lib/mini-supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useERP } from '@/lib/erp-store';
+import { playSyncSuccess, playError, playClick } from '@/lib/sound-engine';
 
 interface Summary {
   totalUsers: number;
@@ -45,8 +46,10 @@ export default function Settings() {
       await resetDB();
       await refreshData();
       await loadSummary();
+      playSyncSuccess();
       toast({ title: 'Database reset complete', description: 'ERP database reset to default seed data.' });
     } catch (err: any) {
+      playError();
       toast({ title: 'Reset failed', description: err.message, variant: 'destructive' });
     } finally {
       setResetting(false);
@@ -62,6 +65,7 @@ export default function Settings() {
     a.download = `erp-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    playSyncSuccess();
     toast({ title: 'Backup exported successfully' });
   };
 
@@ -71,6 +75,7 @@ export default function Settings() {
     await saveDB(parsed);
     await refreshData();
     await loadSummary();
+    playSyncSuccess();
     toast({ title: 'Backup restored successfully' });
   };
 

@@ -7,7 +7,7 @@ import { Plus, Trash2, Users, Search, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { playClientAdded, playClick, playError } from '@/lib/sound-engine';
+import { playClientAdded, playClick, playError, playSuccess } from '@/lib/sound-engine';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
 } from '@/components/ui/dialog';
@@ -132,9 +132,11 @@ export default function ClientMaster() {
     setEditSaving(true);
     try {
       await updateClient(editClient.id, editForm);
+      playSuccess();
       toast({ title: 'Client updated successfully' });
       setEditClient(null);
     } catch (err: any) {
+      playError();
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setEditSaving(false);
