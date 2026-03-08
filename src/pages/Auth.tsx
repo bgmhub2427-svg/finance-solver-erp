@@ -335,9 +335,20 @@ export default function Auth() {
               <Button variant="outline" className="w-full h-11 gap-2 rounded-xl text-sm font-semibold border-primary/30 hover:bg-primary/5"
                 onClick={async () => {
                   playClick();
-                  // Create a temp miniAuth account for signup flow → OrgSetup
-                  const tempPw = 'Temp@' + Date.now() + 'x';
-                  await miniAuth.signUp(mainUser!.email, tempPw);
+                  const mainEmail = mainUser!.email.trim();
+                  const mainPassword = mainUser!.password;
+
+                  // Ensure miniAuth session exists so /OrgSetup can load reliably
+                  const signInRes = await miniAuth.signIn(mainEmail, mainPassword);
+                  if (signInRes.error) {
+                    const signUpRes = await miniAuth.signUp(mainEmail, mainPassword);
+                    if (signUpRes.error) {
+                      playError();
+                      toast({ title: 'Session Error', description: 'Could not start organization setup. Please login again.', variant: 'destructive' });
+                      return;
+                    }
+                  }
+
                   toast({ title: 'New Organization', description: 'Complete the setup wizard to create your organization.' });
                 }}>
                 <Building2 className="w-4 h-4" /> Create New Organization
