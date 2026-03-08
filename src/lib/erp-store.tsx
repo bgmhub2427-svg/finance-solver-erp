@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { miniDB, miniAuth, loadDB, saveDB } from '@/lib/mini-supabase';
+import { miniDB, miniAuth, loadDB, saveDB, switchFY, getAvailableFYs, getActiveFY } from '@/lib/mini-supabase';
 import { Client, Payment, Invoice, HANDLERS, Handler } from './erp-types';
 import { useAuth } from '@/hooks/useAuth';
 
