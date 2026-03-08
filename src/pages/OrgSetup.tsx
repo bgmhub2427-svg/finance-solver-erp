@@ -62,8 +62,10 @@ export default function OrgSetup() {
 
     const slug = orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
 
+    const orgId = crypto.randomUUID?.() || `org-${Date.now()}`;
+    
     createOrg({
-      id: crypto.randomUUID?.() || `org-${Date.now()}`,
+      id: orgId,
       name: orgName.trim(),
       slug,
       owner_id: user?.id || '',
@@ -71,6 +73,11 @@ export default function OrgSetup() {
       created_at: new Date().toISOString(),
       config,
     });
+
+    // Assign org_id to current user
+    if (user?.id) {
+      miniAuth.updateUserOrgId(user.id, orgId);
+    }
   };
 
   const progress = ((step + 1) / totalSteps) * 100;
