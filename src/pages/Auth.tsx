@@ -47,7 +47,7 @@ export default function Auth() {
   const handleMainLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { data, error } = mainAuth.signIn(email.trim(), password);
+    const { data, error } = await mainAuth.signIn(email.trim(), password);
     setLoading(false);
     if (error) { playError(); toast({ title: 'Login Failed', description: error, variant: 'destructive' }); return; }
     playSuccess();
@@ -62,15 +62,29 @@ export default function Auth() {
     if (!pwCheck.valid) { playError(); toast({ title: 'Weak Password', description: pwCheck.errors.join(', '), variant: 'destructive' }); return; }
     setLoading(true);
     const { data, error } = mainAuth.signUp(email.trim(), password);
+    if (error) {
+      setLoading(false);
+      playError();
+      toast({ title: 'Signup Failed', description: error, variant: 'destructive' });
+      return;
+    }
+
+    // Ensure org-level auth session exists for OrgSetup flow (no hidden temp password)
+    const signupRes = await miniAuth.signUp(data!.email, password);
+    if (signupRes.error) {
+      const signInRes = await miniAuth.signIn(data!.email, password);
+      if (signInRes.error) {
+        setLoading(false);
+        playError();
+        toast({ title: 'Signup Partially Completed', description: 'Main account created, but ERP user session could not be started.', variant: 'destructive' });
+        return;
+      }
+    }
+
     setLoading(false);
-    if (error) { playError(); toast({ title: 'Signup Failed', description: error, variant: 'destructive' }); return; }
     playSuccess();
     setMainUser(data);
     resetFields();
-    // New user → go to org setup (handled by signup flow through miniAuth)
-    // For now, create a temp org user account so OrgSetup works
-    const tempPassword = 'Temp@' + Date.now();
-    await miniAuth.signUp(data!.email, tempPassword);
     toast({ title: 'Account Created', description: "Let's set up your organization." });
   };
 

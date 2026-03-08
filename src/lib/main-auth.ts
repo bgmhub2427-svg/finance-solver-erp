@@ -44,45 +44,73 @@ function setMainSession(user: MainUser | null) {
 }
 
 export const mainAuth = {
-  signIn(email: string, password: string): { data: MainUser | null; error: string | null } {
+  async signIn(email: string, password: string): Promise<{ data: MainUser | null; error: string | null }> {
+    const normalizedEmail = email.trim().toLowerCase();
     const users = loadMainUsers();
-    let user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (!user) {
-      // Auto-migrate: check if user exists in mini-supabase (legacy)
-      user = this._tryMigrateFromMiniDB(email, password);
+    const directMatch = users.find(
+      (u) => u.email.toLowerCase() === normalizedEmail && u.password === password,
+    );
+
+    if (directMatch) {
+      setMainSession(directMatch);
+      return { data: directMatch, error: null };
     }
-    if (!user) return { data: null, error: 'Invalid email or password' };
-    setMainSession(user);
-    return { data: user, error: null };
+
+    // If account exists in main-auth but password is wrong, do not fallback.
+    if (users.some((u) => u.email.toLowerCase() === normalizedEmail)) {
+      return { data: null, error: 'Invalid email or password' };
+    }
+
+    const migratedUser = await this._tryMigrateFromMiniDB(normalizedEmail, password);
+    if (!migratedUser) return { data: null, error: 'Invalid email or password' };
+
+    setMainSession(migratedUser);
+    return { data: migratedUser, error: null };
   },
 
-  // Check mini-supabase DB for existing users and auto-create a main account
-  _tryMigrateFromMiniDB(email: string, password: string): MainUser | null {
+  async _tryMigrateFromMiniDB(email: string, password: string): Promise<MainUser | null> {
     try {
-      const raw = localStorage.getItem('erp_global_data');
-      if (!raw) return null;
-      const global = JSON.parse(raw);
-      const miniUsers = global?.users || [];
-      const match = miniUsers.find((u: any) => u.email?.toLowerCase() === email.toLowerCase() && u.password === password);
-      if (!match) return null;
+      const db = await loadDB();
+      const matchedUser = db.users.find(
+        (u) => u.email?.toLowerCase() === email && u.password === password,
+      );
+      if (!matchedUser) return null;
 
-      // Found a matching legacy user – create a main account
+      const orgIdsFromUsers = db.users
+        .filter((u) => u.email?.toLowerCase() === email && !!u.org_id)
+        .map((u) => u.org_id as string);
+      const orgIdsFromOwnership = this._loadOwnerOrgIds(email);
+      const linkedOrgIds = [...new Set([...orgIdsFromUsers, ...orgIdsFromOwnership])];
+
+      const users = loadMainUsers();
+      const existing = users.find((u) => u.email.toLowerCase() === email);
+      if (existing) return existing;
+
       const newUser: MainUser = {
         id: genId(),
-        email: match.email,
-        password: match.password,
-        linked_org_ids: match.org_id ? [match.org_id] : [],
+        email: matchedUser.email,
+        password: matchedUser.password,
+        linked_org_ids: linkedOrgIds,
         created_at: new Date().toISOString(),
       };
-      const users = loadMainUsers();
-      // Don't duplicate
-      if (!users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-        users.push(newUser);
-        saveMainUsers(users);
-      }
+      users.push(newUser);
+      saveMainUsers(users);
       return newUser;
     } catch {
       return null;
+    }
+  },
+
+  _loadOwnerOrgIds(email: string): string[] {
+    try {
+      const raw = localStorage.getItem('erp_organizations');
+      const orgs = raw ? JSON.parse(raw) : [];
+      return orgs
+        .filter((org: any) => org?.owner_email?.toLowerCase() === email)
+        .map((org: any) => org?.id)
+        .filter((id: string | undefined) => !!id);
+    } catch {
+      return [];
     }
   },
 
