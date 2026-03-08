@@ -1,5 +1,6 @@
 // Main user accounts - top-level identity layer (Level 1)
 import { validatePassword } from '@/lib/org-types';
+import { loadDB } from '@/lib/mini-supabase/mini-db';
 
 export interface MainUser {
   id: string;
@@ -45,10 +46,44 @@ function setMainSession(user: MainUser | null) {
 export const mainAuth = {
   signIn(email: string, password: string): { data: MainUser | null; error: string | null } {
     const users = loadMainUsers();
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+    let user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+    if (!user) {
+      // Auto-migrate: check if user exists in mini-supabase (legacy)
+      user = this._tryMigrateFromMiniDB(email, password);
+    }
     if (!user) return { data: null, error: 'Invalid email or password' };
     setMainSession(user);
     return { data: user, error: null };
+  },
+
+  // Check mini-supabase DB for existing users and auto-create a main account
+  _tryMigrateFromMiniDB(email: string, password: string): MainUser | null {
+    try {
+      const raw = localStorage.getItem('erp_global_data');
+      if (!raw) return null;
+      const global = JSON.parse(raw);
+      const miniUsers = global?.users || [];
+      const match = miniUsers.find((u: any) => u.email?.toLowerCase() === email.toLowerCase() && u.password === password);
+      if (!match) return null;
+
+      // Found a matching legacy user – create a main account
+      const newUser: MainUser = {
+        id: genId(),
+        email: match.email,
+        password: match.password,
+        linked_org_ids: match.org_id ? [match.org_id] : [],
+        created_at: new Date().toISOString(),
+      };
+      const users = loadMainUsers();
+      // Don't duplicate
+      if (!users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+        users.push(newUser);
+        saveMainUsers(users);
+      }
+      return newUser;
+    } catch {
+      return null;
+    }
   },
 
   signUp(email: string, password: string): { data: MainUser | null; error: string | null } {
