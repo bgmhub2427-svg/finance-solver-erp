@@ -67,7 +67,8 @@ export default function ERPLayout() {
   const navigate = useNavigate();
   const [globalSearch, setGlobalSearch] = useState('');
 
-  const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : HANDLER_NAV;
+  const { role } = useAuth();
+  const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : role === 'fee_collector' ? FEE_COLLECTOR_NAV : HANDLER_NAV;
 
   return (
     <div className="flex h-screen overflow-hidden">
