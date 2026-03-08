@@ -23,12 +23,13 @@ export default function OrgSetup() {
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [roleLimits, setRoleLimits] = useState<RoleLimits>(defaultRoleLimits('6-20'));
 
-  // Steps: org name + setup questions + role limits
-  const totalSteps = SETUP_STEPS.length + 2;
+  // Steps: org name + org credentials + setup questions + role limits
+  const totalSteps = SETUP_STEPS.length + 3;
   const isNameStep = step === 0;
+  const isCredStep = step === 1;
   const isRoleStep = step === totalSteps - 1;
-  const setupStepIdx = step - 1;
-  const setupStep = !isNameStep && !isRoleStep && setupStepIdx >= 0 && setupStepIdx < SETUP_STEPS.length
+  const setupStepIdx = step - 2;
+  const setupStep = !isNameStep && !isCredStep && !isRoleStep && setupStepIdx >= 0 && setupStepIdx < SETUP_STEPS.length
     ? SETUP_STEPS[setupStepIdx]
     : null;
   const isMulti = (setupStep as any)?.multi === true;
