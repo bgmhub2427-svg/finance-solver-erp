@@ -112,6 +112,14 @@ export function defaultOrgConfig(): OrgConfig {
   };
 }
 
+export const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  manager: 'Manager',
+  handler: 'Handler / Staff',
+  viewer: 'Viewer (Read-Only)',
+  fee_collector: 'Fee Collector',
+};
+
 export const SETUP_STEPS = [
   {
     key: 'org_type',
