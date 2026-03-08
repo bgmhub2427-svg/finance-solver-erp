@@ -128,7 +128,7 @@ export const SETUP_STEPS = [
     key: 'org_type',
     label: 'What type of organization are you?',
     options: [
-      { value: 'ca_firm', label: 'CA / Accounting Firm', desc: 'Tax, audit, and accounting services' },
+      { value: 'ca_firm', label: 'Accounting Firm', desc: 'Tax, audit, and accounting services' },
       { value: 'finance_company', label: 'Finance Company', desc: 'Lending, collections, financial services' },
       { value: 'collection_agency', label: 'Collection Agency', desc: 'Debt recovery and collection' },
       { value: 'consulting', label: 'Consulting Firm', desc: 'Business advisory and consulting' },
