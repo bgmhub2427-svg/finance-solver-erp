@@ -34,6 +34,7 @@ export default function ClientMaster() {
     clientId: '', name: '', phone: '', gstNumber: '', pan: '', status: 'active' as 'active' | 'inactive', handlerCode: handlers[0]?.code || 'K-A-H-001',
     oldFee: 0, oldFeeEndMonth: 'March', oldFeeDue: 0,
     newFee: 0, newFeeStartMonth: 'April', newFeeDue: 0,
+    previousYearPending: 0,
     // Pending tracking fields
     pendingFromYear: FINANCIAL_YEARS[0],
     pendingFromMonth: 'April',
