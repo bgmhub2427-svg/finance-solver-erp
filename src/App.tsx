@@ -38,6 +38,7 @@ function getDefaultPath(role: ReturnType<typeof useAuth>["role"]) {
   if (role === "admin" || role === "manager") return "/control-panel";
   if (role === "viewer") return "/master-database";
   if (role === "handler") return "/control-panel";
+  if (role === "fee_collector") return "/payments";
   return "/auth";
 }
 

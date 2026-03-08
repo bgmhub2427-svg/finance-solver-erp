@@ -3,11 +3,12 @@ import { useERP } from '@/lib/erp-store';
 import { miniDB } from '@/lib/mini-supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { MONTHS } from '@/lib/erp-types';
-import { IndianRupee, Plus, Trash2 } from 'lucide-react';
+import { IndianRupee, Plus, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { playSuccess } from '@/lib/sound-engine';
+import { playPaymentAdded, playClick, playError } from '@/lib/sound-engine';
+import { calculateFeeForRange } from '@/lib/fee-calculator';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from '@/components/ui/dialog';
@@ -24,13 +25,14 @@ const CASH_DENOMINATIONS = [
   { label: '₹20', value: 20 },
   { label: '₹10', value: 10 },
 ];
+
 function generatePaymentId() {
   return "PAY-" + Date.now().toString(36) + "-" + Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 
 export default function PaymentTracking() {
   const { payments, clients, handlers, currentFY, addPayment, removePayment, restorePayment } = useERP();
-  const { isViewer, isAdmin } = useAuth();
+  const { isViewer, isAdmin, role } = useAuth();
   const { toast } = useToast();
   const fyPayments = payments.filter(p => p.financialYear === currentFY);
   const fyClients = clients.filter(c => c.financialYear === currentFY);
@@ -39,21 +41,22 @@ export default function PaymentTracking() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deletedPayments, setDeletedPayments] = useState<any[]>([]);
+  
+  // Client search state
+  const [clientSearch, setClientSearch] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     clientId: '', handlerCode: handlers[0]?.code || 'K-A-H-001',
     paidTermFrom: 'April', paidTermTo: 'April', dueAmount: 0, payment: 0,
     paymentMode: 'cash',
     reason: '', remarks: '',
-    // UPI fields
     upiAmount: 0, utrNumber: '', upiApp: '',
-    // Bank fields
     bankAmount: 0, bankReference: '', bankName: '',
-    // Fee adjustment
     adjustmentAmount: 0,
   });
 
-  // Cash note counter
   const [cashNotes, setCashNotes] = useState<Record<number, number>>({
     500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0,
   });
@@ -64,18 +67,40 @@ export default function PaymentTracking() {
 
   const selectedClient = fyClients.find(c => c.clientId === form.clientId);
 
-  // Auto-fill client data
+  // Filtered clients for search dropdown
+  const filteredClients = useMemo(() => {
+    if (!clientSearch.trim()) return fyClients;
+    const q = clientSearch.toLowerCase();
+    return fyClients.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.clientId.toLowerCase().includes(q) ||
+      c.handlerCode.toLowerCase().includes(q)
+    );
+  }, [fyClients, clientSearch]);
+
+  // Auto-calculate fee based on month range with old/new fee logic
   React.useEffect(() => {
     if (selectedClient) {
+      const feeCalc = calculateFeeForRange({
+        fromMonth: form.paidTermFrom,
+        toMonth: form.paidTermTo,
+        oldFee: selectedClient.oldFee,
+        newFee: selectedClient.newFee,
+        oldFeeEndMonth: selectedClient.oldFeeEndMonth,
+        newFeeStartMonth: selectedClient.newFeeStartMonth,
+      });
+
+      // Total due = fee for selected months + existing pending (includes prev year carry-forward)
+      const totalDue = feeCalc.totalFee + selectedClient.totalPending;
+
       setForm(f => ({
         ...f,
         handlerCode: selectedClient.handlerCode,
-        dueAmount: selectedClient.totalPending + (selectedClient.newFee || selectedClient.oldFee),
+        dueAmount: totalDue,
       }));
     }
-  }, [selectedClient]);
+  }, [selectedClient, form.paidTermFrom, form.paidTermTo]);
 
-  // Calculate total payment based on mode
   const computedPayment = useMemo(() => {
     switch (form.paymentMode) {
       case 'cash': return cashTotal;
@@ -85,43 +110,48 @@ export default function PaymentTracking() {
       default: return form.payment;
     }
   }, [form.paymentMode, cashTotal, form.upiAmount, form.bankAmount, form.adjustmentAmount, form.payment]);
-const handleAdd = async () => {
-  if (!selectedClient) return;
 
-  // Validation
-  if (form.paymentMode === 'upi' && !form.utrNumber.trim()) {
-    toast({ title: 'UTR Number required', description: 'UPI payments require a UTR number', variant: 'destructive' });
-    return;
-  }
-
-  if (form.paymentMode === 'bank' && !form.bankReference.trim()) {
-    toast({ title: 'Reference required', description: 'Bank transfers require a reference number', variant: 'destructive' });
-    return;
-  }
-setSaving(true);
-try {
-
-  const paymentId = generatePaymentId();
-
-  const cashNotesStr = form.paymentMode === 'cash'
-      ? Object.entries(cashNotes)
-          .filter(([, c]) => c > 0)
-          .map(([d, c]) => `₹${d}×${c}`)
-          .join(', ')
-      : '';
-
-    await addPayment({
-      ...form,
-      payment: computedPayment,
-      dueAmount: form.dueAmount,
-      financialYear: currentFY,
-      clientName: selectedClient.name,
-      handlerCode: selectedClient.handlerCode,
+  // Fee breakdown display
+  const feeBreakdown = useMemo(() => {
+    if (!selectedClient) return null;
+    return calculateFeeForRange({
+      fromMonth: form.paidTermFrom,
+      toMonth: form.paidTermTo,
       oldFee: selectedClient.oldFee,
       newFee: selectedClient.newFee,
+      oldFeeEndMonth: selectedClient.oldFeeEndMonth,
+      newFeeStartMonth: selectedClient.newFeeStartMonth,
     });
-playSuccess();
-      // Reset
+  }, [selectedClient, form.paidTermFrom, form.paidTermTo]);
+
+  const handleAdd = async () => {
+    if (!selectedClient) return;
+
+    if (form.paymentMode === 'upi' && !form.utrNumber.trim()) {
+      playError();
+      toast({ title: 'UTR Number required', description: 'UPI payments require a UTR number', variant: 'destructive' });
+      return;
+    }
+
+    if (form.paymentMode === 'bank' && !form.bankReference.trim()) {
+      playError();
+      toast({ title: 'Reference required', description: 'Bank transfers require a reference number', variant: 'destructive' });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await addPayment({
+        ...form,
+        payment: computedPayment,
+        dueAmount: form.dueAmount,
+        financialYear: currentFY,
+        clientName: selectedClient.name,
+        handlerCode: selectedClient.handlerCode,
+        oldFee: selectedClient.oldFee,
+        newFee: selectedClient.newFee,
+      });
+      playPaymentAdded();
       setForm({
         date: new Date().toISOString().split('T')[0], clientId: '', handlerCode: handlers[0]?.code || 'K-A-H-001',
         paidTermFrom: 'April', paidTermTo: 'April', dueAmount: 0, payment: 0, paymentMode: 'cash',
@@ -129,9 +159,11 @@ playSuccess();
         bankAmount: 0, bankReference: '', bankName: '', adjustmentAmount: 0,
       });
       setCashNotes({ 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0 });
+      setClientSearch('');
       setOpen(false);
       toast({ title: 'Payment recorded successfully' });
     } catch (err: any) {
+      playError();
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
@@ -166,6 +198,9 @@ playSuccess();
 
   React.useEffect(() => { loadDeletedPayments(); }, [isAdmin]);
 
+  // Fee collector and above can add payments
+  const canAddPayment = role === 'admin' || role === 'manager' || role === 'handler' || role === 'fee_collector';
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -173,8 +208,8 @@ playSuccess();
           <h1 className="erp-page-title flex items-center gap-2"><IndianRupee className="w-5 h-5" /> Payment Tracking</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{fyPayments.length} Entries — FY {currentFY}</p>
         </div>
-        {!isViewer && (
-        <Dialog open={open} onOpenChange={setOpen}>
+        {canAddPayment && (
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) playClick(); }}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1"><Plus className="w-3.5 h-3.5" /> Record Payment</Button>
           </DialogTrigger>
@@ -185,22 +220,74 @@ playSuccess();
                 <label className="text-xs text-muted-foreground">Date</label>
                 <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Client</label>
-                <select value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })} className="w-full border rounded-sm px-2 py-2 text-sm bg-background">
-                  <option value="">— Select Client —</option>
-                  {fyClients.map(c => <option key={c.clientId} value={c.clientId}>{c.clientId} — {c.name}</option>)}
-                </select>
+
+              {/* Client Search Box */}
+              <div className="relative">
+                <label className="text-xs text-muted-foreground">Search Client</label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    value={clientSearch}
+                    onChange={e => {
+                      setClientSearch(e.target.value);
+                      setShowClientDropdown(true);
+                      if (!e.target.value) setForm(f => ({ ...f, clientId: '' }));
+                    }}
+                    onFocus={() => setShowClientDropdown(true)}
+                    placeholder="Type client name or ID..."
+                    className="pl-8"
+                  />
+                </div>
+                {showClientDropdown && clientSearch.trim() && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {filteredClients.length === 0 ? (
+                      <div className="p-2 text-xs text-muted-foreground">No clients found</div>
+                    ) : (
+                      filteredClients.map(c => (
+                        <button
+                          key={c.clientId}
+                          type="button"
+                          onClick={() => {
+                            setForm(f => ({ ...f, clientId: c.clientId }));
+                            setClientSearch(`${c.clientId} — ${c.name}`);
+                            setShowClientDropdown(false);
+                            playClick();
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex justify-between items-center"
+                        >
+                          <span><span className="erp-mono font-medium">{c.clientId}</span> — {c.name}</span>
+                          <span className="text-muted-foreground erp-mono">{c.handlerCode}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Auto-filled client info */}
+              {/* Auto-filled client info with fee breakdown */}
               {selectedClient && (
                 <div className="p-3 bg-muted/50 rounded-sm space-y-1 text-xs">
                   <div className="flex justify-between"><span className="text-muted-foreground">Client Name</span><span className="font-medium">{selectedClient.name}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Client ID</span><span className="erp-mono">{selectedClient.clientId}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Handler</span><span className="erp-mono">{selectedClient.handlerCode}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Previous Due</span><span className="erp-mono font-bold">{formatCurrency(selectedClient.totalPending)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Monthly Fee</span><span className="erp-mono">{formatCurrency(selectedClient.newFee || selectedClient.oldFee)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Old Fee (until {selectedClient.oldFeeEndMonth})</span><span className="erp-mono">{formatCurrency(selectedClient.oldFee)}/mo</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">New Fee (from {selectedClient.newFeeStartMonth})</span><span className="erp-mono">{formatCurrency(selectedClient.newFee)}/mo</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Previous Pending</span><span className="erp-mono font-bold text-destructive">{formatCurrency(selectedClient.totalPending)}</span></div>
+                  
+                  {/* Fee Breakdown */}
+                  {feeBreakdown && (
+                    <div className="border-t pt-1 mt-1 space-y-0.5">
+                      <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">Fee Breakdown ({form.paidTermFrom} → {form.paidTermTo})</p>
+                      {feeBreakdown.oldMonths > 0 && (
+                        <div className="flex justify-between"><span className="text-muted-foreground">Old fee × {feeBreakdown.oldMonths} months</span><span className="erp-mono">{formatCurrency(feeBreakdown.oldFeeTotal)}</span></div>
+                      )}
+                      {feeBreakdown.newMonths > 0 && (
+                        <div className="flex justify-between"><span className="text-muted-foreground">New fee × {feeBreakdown.newMonths} months</span><span className="erp-mono">{formatCurrency(feeBreakdown.newFeeTotal)}</span></div>
+                      )}
+                      <div className="flex justify-between"><span className="text-muted-foreground">Month fees subtotal</span><span className="erp-mono font-medium">{formatCurrency(feeBreakdown.totalFee)}</span></div>
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between border-t pt-1 mt-1"><span className="font-semibold">Total Payable</span><span className="erp-mono font-bold text-destructive">{formatCurrency(form.dueAmount)}</span></div>
                 </div>
               )}
@@ -228,7 +315,7 @@ playSuccess();
                     <button
                       key={mode}
                       type="button"
-                      onClick={() => setForm({ ...form, paymentMode: mode })}
+                      onClick={() => { setForm({ ...form, paymentMode: mode }); playClick(); }}
                       className={`px-3 py-2 text-xs font-medium rounded-sm border transition-colors ${form.paymentMode === mode ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'}`}
                     >
                       {mode.toUpperCase()}
@@ -255,8 +342,7 @@ playSuccess();
                       <span className="text-xs text-muted-foreground">=</span>
                       <span className="erp-mono text-xs font-bold w-20 text-right">{formatCurrency(d.value * cashNotes[d.value])}</span>
                     </div>
-                  ))}, 
-
+                  ))}
                   <div className="flex justify-between border-t pt-2 mt-2">
                     <span className="text-xs font-semibold">Total Cash</span>
                     <span className="erp-mono text-sm font-bold text-[hsl(var(--success))]">{formatCurrency(cashTotal)}</span>

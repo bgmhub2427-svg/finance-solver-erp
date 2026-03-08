@@ -43,6 +43,12 @@ const HANDLER_NAV = [
   { to: '/ai-planner', icon: Brain, label: 'AI Collection Planner' },
 ];
 
+const FEE_COLLECTOR_NAV = [
+  { to: '/payments', icon: IndianRupee, label: 'Payment Tracking' },
+  { to: '/payment-pending', icon: ClipboardCheck, label: 'Pending Checklist' },
+  { to: '/upload-sync', icon: Receipt, label: 'Upload Sync' },
+];
+
 const VIEWER_NAV = [
   { to: '/master-database', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/collection-dashboard', icon: Calendar, label: 'Collection Dashboard' },
@@ -61,7 +67,8 @@ export default function ERPLayout() {
   const navigate = useNavigate();
   const [globalSearch, setGlobalSearch] = useState('');
 
-  const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : HANDLER_NAV;
+  const { role } = useAuth();
+  const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : role === 'fee_collector' ? FEE_COLLECTOR_NAV : HANDLER_NAV;
 
   return (
     <div className="flex h-screen overflow-hidden">
