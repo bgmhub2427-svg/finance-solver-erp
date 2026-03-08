@@ -174,6 +174,13 @@ function AuthGate() {
 }
 
 function App() {
+  const [loaded, setLoaded] = useState(false);
+  const handleLoaded = useCallback(() => setLoaded(true), []);
+
+  if (!loaded) {
+    return <WelcomeLoader onComplete={handleLoaded} />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
