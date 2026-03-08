@@ -4,12 +4,13 @@ import {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, ChevronLeft,
   ChevronRight, Building2, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
-  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search
+  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search, Plus
 } from 'lucide-react';
 import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
-import { FINANCIAL_YEARS } from '@/lib/erp-types';
+import { getAvailableFYs, createFinancialYear } from '@/lib/mini-supabase';
 import { playClick } from '@/lib/sound-engine';
+import { useToast } from '@/hooks/use-toast';
 
 const ADMIN_NAV = [
   { to: '/control-panel', icon: LayoutDashboard, label: 'Control Panel' },
@@ -63,10 +64,14 @@ const VIEWER_NAV = [
 
 export default function ERPLayout() {
   const [collapsed, setCollapsed] = useState(false);
-  const { currentFY, setCurrentFY } = useERP();
+  const { currentFY, setCurrentFY, refreshData } = useERP();
   const { signOut, user, isAdmin, isViewer, handlerCode } = useAuth();
   const navigate = useNavigate();
   const [globalSearch, setGlobalSearch] = useState('');
+  const [showNewFY, setShowNewFY] = useState(false);
+  const [newFYInput, setNewFYInput] = useState('');
+  const { toast } = useToast();
+  const availableFYs = getAvailableFYs();
 
   const { role } = useAuth();
   const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : role === 'fee_collector' ? FEE_COLLECTOR_NAV : HANDLER_NAV;
@@ -172,14 +177,55 @@ export default function ERPLayout() {
               <span className="text-[10px] text-sidebar-foreground/40 font-medium">FY</span>
               <select
                 value={currentFY}
-                onChange={e => { setCurrentFY(e.target.value); playClick(); }}
+                onChange={e => { setCurrentFY(e.target.value); playClick(); refreshData(); }}
                 className="bg-transparent text-sidebar-accent-foreground text-xs font-semibold focus:outline-none cursor-pointer"
               >
-                {FINANCIAL_YEARS.map(fy => (
+                {availableFYs.map(fy => (
                   <option key={fy} value={fy}>{fy}</option>
                 ))}
               </select>
+              {isAdmin && (
+                <button
+                  onClick={() => setShowNewFY(!showNewFY)}
+                  className="ml-1 p-0.5 rounded hover:bg-primary/20 transition-colors"
+                  title="Create New Financial Year"
+                >
+                  <Plus className="w-3.5 h-3.5 text-primary" />
+                </button>
+              )}
             </div>
+            {showNewFY && isAdmin && (
+              <div className="flex items-center gap-2 bg-sidebar-accent/60 rounded-lg px-3 py-1.5">
+                <input
+                  value={newFYInput}
+                  onChange={e => setNewFYInput(e.target.value)}
+                  placeholder="e.g. 2027-2028"
+                  className="h-7 w-28 rounded border border-sidebar-border/60 bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
+                />
+                <button
+                  onClick={async () => {
+                    if (!newFYInput.match(/^\d{4}-\d{4}$/)) {
+                      toast({ title: 'Invalid format', description: 'Use YYYY-YYYY format (e.g. 2027-2028)', variant: 'destructive' });
+                      return;
+                    }
+                    try {
+                      await createFinancialYear(newFYInput, true);
+                      toast({ title: `FY ${newFYInput} created`, description: 'Clients carried forward with pending balances.' });
+                      setCurrentFY(newFYInput);
+                      await refreshData();
+                      setShowNewFY(false);
+                      setNewFYInput('');
+                      playClick();
+                    } catch (err: any) {
+                      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+                    }
+                  }}
+                  className="h-7 px-3 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Create
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

@@ -4,7 +4,7 @@ export { miniDB } from './mini-query';
 export { miniAuth } from './mini-auth';
 export { loadDB, saveDB } from './mini-db';
 export type { UserRole, MiniUser } from './mini-db';
-export { isAdminEmail } from './mini-db';
+export { isAdminEmail, switchFY, createFinancialYear, deleteFinancialYear, getActiveFY, getAvailableFYs, setAvailableFYs } from './mini-db';
 
 export async function resetDB() {
 

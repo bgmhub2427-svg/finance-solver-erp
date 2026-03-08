@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { miniDB, miniAuth, loadDB, saveDB } from '@/lib/mini-supabase';
+import { miniDB, miniAuth, loadDB, saveDB, switchFY, getAvailableFYs, getActiveFY } from '@/lib/mini-supabase';
 import { Client, Payment, Invoice, HANDLERS, Handler } from './erp-types';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -74,7 +74,12 @@ export function ERPProvider({ children }: { children: ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [handlers, setHandlers] = useState<Handler[]>(HANDLERS);
-  const [currentFY, setCurrentFY] = useState('2025-2026');
+  const [currentFY, setCurrentFYState] = useState(getActiveFY());
+
+  const setCurrentFY = useCallback((fy: string) => {
+    switchFY(fy);
+    setCurrentFYState(fy);
+  }, []);
   const [loading, setLoading] = useState(true);
 
   const can = (module: ModuleName, action: ActionName) => {
@@ -207,7 +212,7 @@ export function ERPProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, currentFY]);
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {

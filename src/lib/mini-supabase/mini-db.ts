@@ -1,4 +1,9 @@
-import { loadDatabaseState, saveDatabaseState } from './mini-indexeddb';
+import {
+  loadGlobalData, saveGlobalData, loadFYData, saveFYData,
+  loadLegacyDatabase, getActiveFY, setActiveFY as setActiveFYStorage,
+  getAvailableFYs, setAvailableFYs,
+  type GlobalData, type FYData,
+} from './mini-indexeddb';
 
 export type UserRole = 'admin' | 'manager' | 'handler' | 'viewer';
 
@@ -29,10 +34,6 @@ export interface ERPDatabase {
   fraud_alerts: Record<string, any>[];
 }
 
-const DEFAULT_HANDLERS = [
-
-];
-
 // Admin email list — any email here gets admin role on signup
 const ADMIN_EMAILS = [
   'admin@ka.com',
@@ -48,13 +49,23 @@ export function isAdminEmail(email: string): boolean {
 
 const uid = () => (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
 
-let memDB: ERPDatabase | null = null;
+// ── In-memory caches ────────────────────────────────────────────────
+let memGlobal: GlobalData | null = null;
+let memFY: { fy: string; data: FYData } | null = null;
 
-function cloneDB(db: ERPDatabase): ERPDatabase {
-  return JSON.parse(JSON.stringify(db)) as ERPDatabase;
+function clone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj)) as T;
 }
 
-export function defaultDB(): ERPDatabase {
+const GLOBAL_FIELDS: (keyof ERPDatabase)[] = ['users', 'handlers', 'audit_logs'];
+const FY_FIELDS: (keyof ERPDatabase)[] = [
+  'clients', 'payments', 'invoices', 'invoice_items',
+  'income', 'expenses', 'fee_types', 'client_fees',
+  'upload_batches', 'raw_json_logs', 'client_lifecycle',
+  'month_locks', 'fraud_alerts',
+];
+
+function defaultGlobal(): GlobalData {
   return {
     users: [
       { id: uid(), email: 'admin@ka.com', password: 'Ka@2026', role: 'admin', handler_id: null },
@@ -63,14 +74,19 @@ export function defaultDB(): ERPDatabase {
       { id: uid(), email: 'jana@admin.com', password: 'KA@JA@fee.123', role: 'admin', handler_id: null },
       { id: uid(), email: 'manohar@admin.com', password: 'KA@M@fee.123', role: 'admin', handler_id: null },
     ],
+    handlers: [],
+    audit_logs: [],
+  };
+}
+
+function defaultFYData(): FYData {
+  return {
     clients: [],
     payments: [],
     invoices: [],
     invoice_items: [],
-    handlers: DEFAULT_HANDLERS.map(([code, name]) => ({ id: uid(), code, name, active: true, user_id: null, created_at: new Date().toISOString() })),
     income: [],
     expenses: [],
-    audit_logs: [],
     fee_types: [],
     client_fees: [],
     upload_batches: [],
@@ -81,59 +97,190 @@ export function defaultDB(): ERPDatabase {
   };
 }
 
-function ensureAllFields(db: any): ERPDatabase {
-  const defaults = defaultDB();
-  const merged: any = { ...db };
-  for (const key of Object.keys(defaults) as (keyof ERPDatabase)[]) {
-    if (!Array.isArray(merged[key])) {
-      merged[key] = defaults[key];
-    }
+export function defaultDB(): ERPDatabase {
+  return { ...defaultGlobal(), ...defaultFYData() };
+}
+
+function ensureGlobalFields(g: any): GlobalData {
+  const defaults = defaultGlobal();
+  const merged: any = { ...g };
+  for (const key of GLOBAL_FIELDS) {
+    if (!Array.isArray(merged[key])) merged[key] = (defaults as any)[key];
   }
   // Ensure all admin accounts exist
   const existingEmails = new Set((merged.users as MiniUser[]).map(u => u.email.toLowerCase()));
-  const defaultUsers = defaults.users;
-  for (const du of defaultUsers) {
-    if (!existingEmails.has(du.email.toLowerCase())) {
-      merged.users.push(du);
-    }
+  for (const du of defaults.users) {
+    if (!existingEmails.has(du.email.toLowerCase())) merged.users.push(du);
   }
-  // Ensure existing admin emails have admin role
+  // Ensure admin emails have admin role
   for (const user of merged.users as MiniUser[]) {
-    if (isAdminEmail(user.email) && user.role !== 'admin') {
-      user.role = 'admin';
-    }
+    if (isAdminEmail(user.email) && user.role !== 'admin') user.role = 'admin';
   }
-  return merged as ERPDatabase;
+  return merged as GlobalData;
 }
 
-export async function loadDB(): Promise<ERPDatabase> {
-  if (memDB) return cloneDB(memDB);
+function ensureFYFields(f: any): FYData {
+  const defaults = defaultFYData();
+  const merged: any = { ...f };
+  for (const key of FY_FIELDS) {
+    if (!Array.isArray(merged[key])) merged[key] = (defaults as any)[key];
+  }
+  return merged as FYData;
+}
 
-  const persisted = await loadDatabaseState();
-  if (persisted) {
-    memDB = ensureAllFields(persisted);
-    await saveDatabaseState(memDB);
-    return cloneDB(memDB);
+function splitDB(db: ERPDatabase): { global: GlobalData; fyData: FYData } {
+  const global: any = {};
+  for (const key of GLOBAL_FIELDS) global[key] = (db as any)[key];
+  const fyData: any = {};
+  for (const key of FY_FIELDS) fyData[key] = (db as any)[key];
+  return { global: global as GlobalData, fyData: fyData as FYData };
+}
+
+// ── Load / Save ─────────────────────────────────────────────────────
+
+export async function loadDB(): Promise<ERPDatabase> {
+  const fy = getActiveFY();
+
+  // Return cached if available and same FY
+  if (memGlobal && memFY && memFY.fy === fy) {
+    return clone({ ...memGlobal, ...memFY.data } as ERPDatabase);
   }
 
-  memDB = defaultDB();
-  await saveDatabaseState(memDB);
-  return cloneDB(memDB);
+  // Load global
+  let global = await loadGlobalData();
+  if (!global) {
+    // Try legacy migration
+    const legacy = await loadLegacyDatabase();
+    if (legacy) {
+      const split = splitDB(legacy as ERPDatabase);
+      global = ensureGlobalFields(split.global);
+      const fyData = ensureFYFields(split.fyData);
+      await Promise.all([saveGlobalData(global), saveFYData(fy, fyData)]);
+      memGlobal = global;
+      memFY = { fy, data: fyData };
+      return clone({ ...global, ...fyData } as ERPDatabase);
+    }
+    global = defaultGlobal();
+    await saveGlobalData(global);
+  }
+  global = ensureGlobalFields(global);
+
+  // Load FY data
+  let fyData = await loadFYData(fy);
+  if (!fyData) {
+    fyData = defaultFYData();
+    await saveFYData(fy, fyData);
+  }
+  fyData = ensureFYFields(fyData);
+
+  memGlobal = global;
+  memFY = { fy, data: fyData };
+
+  // Ensure FY is in list
+  const fys = getAvailableFYs();
+  if (!fys.includes(fy)) {
+    fys.push(fy);
+    fys.sort();
+    setAvailableFYs(fys);
+  }
+
+  return clone({ ...global, ...fyData } as ERPDatabase);
 }
 
 export async function saveDB(db: ERPDatabase) {
-  const snapshot = cloneDB(db);
-  memDB = snapshot;
-  await saveDatabaseState(snapshot);
+  const fy = getActiveFY();
+  const { global, fyData } = splitDB(db);
+  const snapshot = clone(db);
+  memGlobal = clone(global);
+  memFY = { fy, data: clone(fyData) };
+  await Promise.all([saveGlobalData(global), saveFYData(fy, fyData)]);
 }
 
 export async function resetDB() {
-  const seed = defaultDB();
-  memDB = seed;
-  await saveDatabaseState(seed);
-  return cloneDB(seed);
+  const fy = getActiveFY();
+  const global = defaultGlobal();
+  const fyData = defaultFYData();
+  memGlobal = global;
+  memFY = { fy, data: fyData };
+  await Promise.all([saveGlobalData(global), saveFYData(fy, fyData)]);
+  return clone({ ...global, ...fyData } as ERPDatabase);
 }
 
 export function genId() {
   return uid();
+}
+
+// ── FY Management ───────────────────────────────────────────────────
+
+export { getActiveFY, getAvailableFYs, setAvailableFYs };
+
+export function switchFY(fy: string) {
+  setActiveFYStorage(fy);
+  // Invalidate FY cache so next loadDB fetches correct data
+  memFY = null;
+}
+
+export async function createFinancialYear(newFY: string, carryForward: boolean = true): Promise<void> {
+  // Check if FY already exists
+  const existing = await loadFYData(newFY);
+  if (existing && existing.clients && existing.clients.length > 0) {
+    throw new Error(`Financial Year ${newFY} already has data`);
+  }
+
+  const currentFY = getActiveFY();
+  let newFYData = defaultFYData();
+
+  if (carryForward) {
+    // Load current FY data to carry forward clients
+    const currentData = await loadFYData(currentFY);
+    if (currentData && currentData.clients) {
+      newFYData.clients = currentData.clients
+        .filter((c: any) => !c.deleted && c.status !== 'inactive')
+        .map((c: any) => ({
+          ...c,
+          id: uid(),
+          financial_year: newFY,
+          // Carry forward pending as previous year pending
+          previous_year_pending: Number(c.total_pending || 0),
+          // Old fee becomes the new fee from previous year
+          old_fee: Number(c.new_fee || c.old_fee || 0),
+          old_fee_end_month: 'March',
+          old_fee_due: 0,
+          new_fee: Number(c.new_fee || 0),
+          new_fee_start_month: 'April',
+          new_fee_due: 0,
+          total_paid_fy: 0,
+          total_pending: Number(c.total_pending || 0), // Carry forward pending
+          paid_term: '',
+          created_at: new Date().toISOString(),
+        }));
+    }
+  }
+
+  await saveFYData(newFY, newFYData);
+
+  // Add to FY list
+  const fys = getAvailableFYs();
+  if (!fys.includes(newFY)) {
+    fys.push(newFY);
+    fys.sort();
+    setAvailableFYs(fys);
+  }
+}
+
+export async function deleteFinancialYear(fy: string): Promise<void> {
+  const fys = getAvailableFYs();
+  if (fys.length <= 1) throw new Error('Cannot delete the only financial year');
+  
+  // Save empty data (effectively deleting)
+  await saveFYData(fy, defaultFYData());
+  
+  const newFYs = fys.filter(f => f !== fy);
+  setAvailableFYs(newFYs);
+  
+  // If active FY was deleted, switch to the latest
+  if (getActiveFY() === fy) {
+    const latest = newFYs[newFYs.length - 1];
+    switchFY(latest);
+  }
 }
