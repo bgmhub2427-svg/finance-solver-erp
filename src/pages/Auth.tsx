@@ -8,9 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { playClick, playSuccess, playError } from '@/lib/sound-engine';
 import { validatePassword, type Organization } from '@/lib/org-types';
 import { useOrg } from '@/hooks/useOrg';
+import OrgSetup from './OrgSetup';
 import kaLogo from '@/assets/kota-associates-logo.png';
 
-type AuthStep = 'choose' | 'main-login' | 'main-signup' | 'org-select' | 'org-auth' | 'org-user-login';
+type AuthStep = 'choose' | 'main-login' | 'main-signup' | 'org-select' | 'org-setup' | 'org-auth' | 'org-user-login';
 
 export default function Auth() {
   const [step, setStep] = useState<AuthStep>('choose');
@@ -29,9 +30,8 @@ export default function Auth() {
 
   // One-time reset: clear all demo/test data so user starts fresh
   useEffect(() => {
-    const RESET_FLAG = 'erp_fresh_reset_v1';
+    const RESET_FLAG = 'erp_fresh_reset_v2';
     if (!localStorage.getItem(RESET_FLAG)) {
-      // Clear all ERP-related localStorage keys
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -40,14 +40,9 @@ export default function Auth() {
         }
       }
       keysToRemove.forEach(k => localStorage.removeItem(k));
-
-      // Clear IndexedDB
-      try {
-        indexedDB.deleteDatabase('erp_finance_solver');
-      } catch {}
-
+      try { indexedDB.deleteDatabase('erp_finance_solver'); } catch {}
       localStorage.setItem(RESET_FLAG, 'done');
-      console.log('[Auth] Cleared all existing data for fresh start');
+      console.log('[Auth] Cleared all existing data for fresh start v2');
     }
   }, []);
 
@@ -63,6 +58,7 @@ export default function Auth() {
     playClick();
     if (step === 'main-login' || step === 'main-signup') { setStep('choose'); resetFields(); }
     else if (step === 'org-select') { mainAuth.signOut(); setMainUser(null); setStep('choose'); resetFields(); }
+    else if (step === 'org-setup') { setStep('org-select'); }
     else if (step === 'org-auth') { setSelectedOrg(null); setOrgEmail(''); setOrgPassword(''); setStep('org-select'); }
     else if (step === 'org-user-login') { setOrgUserEmail(''); setOrgUserPassword(''); setStep('org-auth'); }
   };
@@ -80,36 +76,23 @@ export default function Auth() {
     setStep('org-select');
   };
 
-  // Step 2: Main account signup
+  // Step 2: Main account signup — NO miniAuth session, just main account
   const handleMainSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pwCheck.valid) { playError(); toast({ title: 'Weak Password', description: pwCheck.errors.join(', '), variant: 'destructive' }); return; }
     setLoading(true);
     const { data, error } = mainAuth.signUp(email.trim(), password);
+    setLoading(false);
     if (error) {
-      setLoading(false);
       playError();
       toast({ title: 'Signup Failed', description: error, variant: 'destructive' });
       return;
     }
-
-    // Ensure org-level auth session exists for OrgSetup flow (no hidden temp password)
-    const signupRes = await miniAuth.signUp(data!.email, password);
-    if (signupRes.error) {
-      const signInRes = await miniAuth.signIn(data!.email, password);
-      if (signInRes.error) {
-        setLoading(false);
-        playError();
-        toast({ title: 'Signup Partially Completed', description: 'Main account created, but ERP user session could not be started.', variant: 'destructive' });
-        return;
-      }
-    }
-
-    setLoading(false);
     playSuccess();
     setMainUser(data);
     resetFields();
-    toast({ title: 'Account Created', description: "Let's set up your organization." });
+    toast({ title: 'Account Created', description: 'Now create your first organization.' });
+    setStep('org-select');
   };
 
   // Step 3: Org selection
@@ -136,7 +119,7 @@ export default function Auth() {
     }
   };
 
-  // Step 5: Org user login
+  // Step 5: Org user login — this is the ONLY place miniAuth session is created
   const handleOrgUserLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -145,12 +128,20 @@ export default function Auth() {
       if (error) throw error;
       playSuccess();
       toast({ title: 'Welcome', description: `Signed into ${selectedOrg?.name || 'organization'}.` });
+      // miniAuth session is now set → AuthProvider will detect and redirect to ERP
     } catch (err: any) {
       playError();
-      toast({ title: 'Login Failed', description: err.message, variant: 'destructive' });
+      toast({ title: 'Login Failed', description: err.message || 'Invalid credentials', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
+  };
+
+  // Callback when OrgSetup completes
+  const handleOrgSetupComplete = () => {
+    playSuccess();
+    toast({ title: 'Organization Created', description: 'Now select your organization and login.' });
+    setStep('org-select');
   };
 
   // Get orgs linked to main user
@@ -158,16 +149,32 @@ export default function Auth() {
     ? orgs.filter(o => mainUser.linked_org_ids.includes(o.id))
     : [];
 
+  // Refresh mainUser's linked_org_ids when orgs change
+  useEffect(() => {
+    if (mainUser) {
+      const refreshed = mainAuth.getSession();
+      if (refreshed && refreshed.linked_org_ids.length !== mainUser.linked_org_ids.length) {
+        setMainUser(refreshed);
+      }
+    }
+  }, [orgs, mainUser]);
+
   const stepTitle: Record<AuthStep, string> = {
     'choose': '',
     'main-login': 'Sign In to Your Account',
     'main-signup': 'Create Your Account',
     'org-select': 'Select Organization',
+    'org-setup': 'Create Organization',
     'org-auth': `Authenticate: ${selectedOrg?.name || ''}`,
     'org-user-login': `Login to ${selectedOrg?.name || ''}`,
   };
 
-  const stepNumber = step === 'choose' ? 0 : step === 'main-login' || step === 'main-signup' ? 1 : step === 'org-select' ? 2 : step === 'org-auth' ? 3 : 4;
+  const stepNumber = step === 'choose' ? 0 : step === 'main-login' || step === 'main-signup' ? 1 : step === 'org-select' || step === 'org-setup' ? 2 : step === 'org-auth' ? 3 : 4;
+
+  // Render OrgSetup as full page when on that step
+  if (step === 'org-setup') {
+    return <OrgSetup mainUser={mainUser} onComplete={handleOrgSetupComplete} onBack={() => { setStep('org-select'); playClick(); }} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center auth-bg relative overflow-hidden">
@@ -357,24 +364,7 @@ export default function Auth() {
               )}
 
               <Button variant="outline" className="w-full h-11 gap-2 rounded-xl text-sm font-semibold border-primary/30 hover:bg-primary/5"
-                onClick={async () => {
-                  playClick();
-                  const mainEmail = mainUser!.email.trim();
-                  const mainPassword = mainUser!.password;
-
-                  // Ensure miniAuth session exists so /OrgSetup can load reliably
-                  const signInRes = await miniAuth.signIn(mainEmail, mainPassword);
-                  if (signInRes.error) {
-                    const signUpRes = await miniAuth.signUp(mainEmail, mainPassword);
-                    if (signUpRes.error) {
-                      playError();
-                      toast({ title: 'Session Error', description: 'Could not start organization setup. Please login again.', variant: 'destructive' });
-                      return;
-                    }
-                  }
-
-                  toast({ title: 'New Organization', description: 'Complete the setup wizard to create your organization.' });
-                }}>
+                onClick={() => { playClick(); setStep('org-setup'); }}>
                 <Building2 className="w-4 h-4" /> Create New Organization
               </Button>
             </>
