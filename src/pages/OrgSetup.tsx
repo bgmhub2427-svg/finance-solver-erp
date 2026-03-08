@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Building2, ChevronRight, ChevronLeft, Check, Sparkles, Users, Minus, Plus } from 'lucide-react';
+import { Building2, ChevronRight, ChevronLeft, Check, Sparkles, Users, Minus, Plus, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrg } from '@/hooks/useOrg';
 import { useAuth } from '@/hooks/useAuth';
 import { miniAuth } from '@/lib/mini-supabase';
-import { SETUP_STEPS, deriveModules, defaultRoleLimits, ROLE_LABELS, type OrgConfig, type RoleLimits } from '@/lib/org-types';
+import { mainAuth } from '@/lib/main-auth';
+import { SETUP_STEPS, deriveModules, defaultRoleLimits, ROLE_LABELS, validatePassword, type OrgConfig, type RoleLimits } from '@/lib/org-types';
 import { playClick, playSuccess } from '@/lib/sound-engine';
+import { useToast } from '@/hooks/use-toast';
 import kaLogo from '@/assets/kota-associates-logo.png';
 
 export default function OrgSetup() {
