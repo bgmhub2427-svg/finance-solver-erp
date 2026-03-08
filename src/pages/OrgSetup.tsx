@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, ChevronRight, ChevronLeft, Check, Sparkles, Users, Minus, Plus, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Building2, ChevronRight, ChevronLeft, Check, X, Sparkles, Users, Minus, Plus, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrg } from '@/hooks/useOrg';
