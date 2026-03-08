@@ -280,6 +280,7 @@ export default function ClientMaster() {
               <th className="text-right">New Fee</th>
               <th className="text-right">Total Due</th>
               <th className="text-right">Paid</th>
+              <th className="text-right text-warning">Prev Yr Pending</th>
               <th className="text-right">Pending</th>
               <th>Status</th>
               {canEditClients && <th></th>}
@@ -287,43 +288,52 @@ export default function ClientMaster() {
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={canEditClients ? 12 : 11} className="text-center py-8 text-muted-foreground text-sm">No clients found.</td></tr>
+              <tr><td colSpan={canEditClients ? 13 : 12} className="text-center py-8 text-muted-foreground text-sm">No clients found.</td></tr>
             )}
-            {filtered.map(c => (
-              <tr key={c.id}>
-                <td className="erp-mono text-xs">{c.clientId}</td>
-                <td className="font-medium text-xs">{c.name}</td>
-                <td className="erp-mono text-xs">{c.phone}</td>
-                <td className="erp-mono text-xs">{c.gstNumber || '—'}</td>
-                <td className="erp-mono text-xs">{c.handlerCode}</td>
-                <td className="erp-mono text-xs text-right">{formatCurrency(c.oldFee)}</td>
-                <td className="erp-mono text-xs text-right">{formatCurrency(c.newFee)}</td>
-                <td className="erp-mono text-xs text-right">{formatCurrency(c.oldFeeDue + c.newFeeDue)}</td>
-                <td className="erp-mono text-xs text-right">{formatCurrency(c.totalPaidFY)}</td>
-                <td className="erp-mono text-xs text-right font-bold text-destructive">{formatCurrency(c.totalPending)}</td>
-                <td>
-                  {c.totalPending === 0 ? (
-                    <span className="erp-badge erp-badge-success">PAID</span>
-                  ) : (
-                    <span className="erp-badge erp-badge-danger">DUE</span>
-                  )}
-                </td>
-                {canEditClients && (
-                  <td className="flex items-center gap-1">
-                    {isAdmin && (
-                      <button onClick={() => openEditDialog(c)} className="text-muted-foreground hover:text-foreground transition-colors">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {canDeleteClient(c.id) && (
-                      <button onClick={() => setDeleteClientId(c.id)} className="text-destructive/70 hover:text-destructive transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+            {filtered.map(c => {
+              // Calculate previous year pending
+              const fyParts = currentFY.split('-').map(Number);
+              const prevFY = `${fyParts[0] - 1}-${fyParts[1] - 1}`;
+              const prevClient = clients.find(pc => pc.clientId === c.clientId && pc.financialYear === prevFY);
+              const prevYearPending = prevClient ? prevClient.totalPending : 0;
+
+              return (
+                <tr key={c.id}>
+                  <td className="erp-mono text-xs">{c.clientId}</td>
+                  <td className="font-medium text-xs">{c.name}</td>
+                  <td className="erp-mono text-xs">{c.phone}</td>
+                  <td className="erp-mono text-xs">{c.gstNumber || '—'}</td>
+                  <td className="erp-mono text-xs">{c.handlerCode}</td>
+                  <td className="erp-mono text-xs text-right">{formatCurrency(c.oldFee)}</td>
+                  <td className="erp-mono text-xs text-right">{formatCurrency(c.newFee)}</td>
+                  <td className="erp-mono text-xs text-right">{formatCurrency(c.oldFeeDue + c.newFeeDue)}</td>
+                  <td className="erp-mono text-xs text-right">{formatCurrency(c.totalPaidFY)}</td>
+                  <td className="erp-mono text-xs text-right font-semibold text-warning">{prevYearPending > 0 ? formatCurrency(prevYearPending) : '—'}</td>
+                  <td className="erp-mono text-xs text-right font-bold text-destructive">{formatCurrency(c.totalPending)}</td>
+                  <td>
+                    {c.totalPending === 0 ? (
+                      <span className="erp-badge erp-badge-success">PAID</span>
+                    ) : (
+                      <span className="erp-badge erp-badge-danger">DUE</span>
                     )}
                   </td>
-                )}
-              </tr>
-            ))}
+                  {canEditClients && (
+                    <td className="flex items-center gap-1">
+                      {isAdmin && (
+                        <button onClick={() => openEditDialog(c)} className="text-muted-foreground hover:text-foreground transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canDeleteClient(c.id) && (
+                        <button onClick={() => setDeleteClientId(c.id)} className="text-destructive/70 hover:text-destructive transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
