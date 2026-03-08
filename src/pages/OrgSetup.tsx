@@ -161,6 +161,61 @@ export default function OrgSetup() {
                 </p>
               </div>
             </div>
+          ) : isCredStep ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium text-foreground">Set Organization Credentials</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                These credentials will be required to access this organization. Share them only with authorized team members.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Organization Email</label>
+                  <Input
+                    type="email"
+                    value={orgEmail}
+                    onChange={e => setOrgEmail(e.target.value)}
+                    placeholder="org@company.com"
+                    className="mt-1 h-11 rounded-xl"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Organization Password</label>
+                  <div className="relative">
+                    <Input
+                      type={showOrgPw ? 'text' : 'password'}
+                      value={orgPassword}
+                      onChange={e => setOrgPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="mt-1 h-11 rounded-xl pr-10"
+                    />
+                    <button type="button" onClick={() => setShowOrgPw(!showOrgPw)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showOrgPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {orgPassword.length > 0 && (
+                    <div className="grid grid-cols-2 gap-1 mt-1.5">
+                      {[
+                        { label: '8+ chars', ok: orgPassword.length >= 8 },
+                        { label: 'Uppercase', ok: /[A-Z]/.test(orgPassword) },
+                        { label: 'Lowercase', ok: /[a-z]/.test(orgPassword) },
+                        { label: 'Number', ok: /[0-9]/.test(orgPassword) },
+                        { label: 'Special', ok: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(orgPassword) },
+                      ].map(r => (
+                        <div key={r.label} className="flex items-center gap-1">
+                          {r.ok ? <Check className="w-3 h-3 text-[hsl(var(--success))]" /> : <X className="w-3 h-3 text-muted-foreground/40" />}
+                          <span className={`text-[10px] ${r.ok ? 'text-[hsl(var(--success))]' : 'text-muted-foreground/60'}`}>{r.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           ) : isRoleStep ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
