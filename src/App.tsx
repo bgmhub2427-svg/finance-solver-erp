@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import type { ReactNode } from "react";
+import WelcomeLoader from "@/components/WelcomeLoader";
 import { ERPProvider } from "@/lib/erp-store";
 import { useDailyReportAutoSave } from "@/hooks/useDailyReportAutoSave";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
@@ -172,6 +174,13 @@ function AuthGate() {
 }
 
 function App() {
+  const [loaded, setLoaded] = useState(false);
+  const handleLoaded = useCallback(() => setLoaded(true), []);
+
+  if (!loaded) {
+    return <WelcomeLoader onComplete={handleLoaded} />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

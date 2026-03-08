@@ -1,11 +1,14 @@
-import { ShieldCheck, RotateCcw, Users, UserCog, Download, Upload, FileClock, Clock, HardDrive } from 'lucide-react';
+import { ShieldCheck, RotateCcw, Users, UserCog, Download, Upload, FileClock, Clock, HardDrive, Minus, Plus, Key, Building2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { miniDB, resetDB, loadDB, saveDB } from '@/lib/mini-supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useERP } from '@/lib/erp-store';
+import { useAuth } from '@/hooks/useAuth';
+import { useOrg } from '@/hooks/useOrg';
 import { playSyncSuccess, playError, playClick } from '@/lib/sound-engine';
 import { getBackupInterval, setBackupInterval, getLastBackupTime, type BackupInterval } from '@/lib/auto-backup';
+import { ROLE_LABELS, type RoleLimits } from '@/lib/org-types';
 
 interface Summary {
   totalUsers: number;
@@ -22,10 +25,14 @@ export default function Settings() {
   const [backupFreq, setBackupFreq] = useState<BackupInterval>(getBackupInterval());
   const { toast } = useToast();
   const { refreshData } = useERP();
+  const { user, role } = useAuth();
+  const { org, updateOrgConfig } = useOrg();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const lastBackup = getLastBackupTime();
   const lastBackupStr = lastBackup ? new Date(lastBackup).toLocaleString() : 'Never';
+
+  const roleLimits: RoleLimits = org?.config?.role_limits || { admin: 2, manager: 3, handler: 10, viewer: 5, fee_collector: 3 };
 
   const loadSummary = async () => {
     const [{ data: users }, { data: handlers }, { data: logs }] = await Promise.all([
@@ -34,9 +41,9 @@ export default function Settings() {
       miniDB.from('audit_logs').select('*').order('timestamp', { ascending: false }),
     ]);
 
-    const roleCount = { admin: 0, handler: 0, viewer: 0 };
-    (users || []).forEach((user: any) => {
-      if (user.role in roleCount) roleCount[user.role as 'admin' | 'handler' | 'viewer'] += 1;
+    const roleCount: Record<string, number> = { admin: 0, manager: 0, handler: 0, viewer: 0, fee_collector: 0 };
+    (users || []).forEach((u: any) => {
+      if (u.role in roleCount) roleCount[u.role] += 1;
     });
 
     setSummary({ totalUsers: users?.length || 0, totalHandlers: handlers?.length || 0, roleCount });
@@ -44,6 +51,13 @@ export default function Settings() {
   };
 
   useEffect(() => { loadSummary(); }, []);
+
+  const adjustRoleLimit = (roleKey: keyof RoleLimits, delta: number) => {
+    const newLimits = { ...roleLimits, [roleKey]: Math.max(0, Math.min(99, roleLimits[roleKey] + delta)) };
+    updateOrgConfig({ role_limits: newLimits });
+    playClick();
+    toast({ title: 'Role limit updated', description: `${ROLE_LABELS[roleKey]}: ${newLimits[roleKey]}` });
+  };
 
   const handleReset = async () => {
     setResetting(true);
@@ -95,20 +109,128 @@ export default function Settings() {
     <div className="space-y-4">
       <div>
         <h1 className="erp-page-title flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Settings</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Admin-only system controls and enterprise summaries.</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Admin-only system controls, credentials, and organization config.</p>
       </div>
 
+      {/* Your Credentials */}
+      <div className="erp-kpi-card space-y-3">
+        <div className="flex items-center gap-2">
+          <Key className="w-4 h-4 text-primary" />
+          <h2 className="text-sm font-semibold">Your Credentials</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-muted/50 border border-border/40">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Email</p>
+            <p className="text-sm font-mono font-medium truncate">{user?.email || '—'}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border/40">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Role</p>
+            <p className="text-sm font-semibold uppercase">{role || '—'}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border/40">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">User ID</p>
+            <p className="text-xs font-mono truncate">{user?.id || '—'}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border/40">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Organization</p>
+            <p className="text-sm font-medium truncate">{org?.name || '—'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Organization Info */}
+      {org && (
+        <div className="erp-kpi-card space-y-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold">Organization Details</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/40">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Org Type</p>
+              <p className="text-sm font-medium capitalize">{org.config.org_type?.replace('_', ' ')}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/40">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Team Size</p>
+              <p className="text-sm font-medium">{org.config.team_size}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/40">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Billing</p>
+              <p className="text-sm font-medium capitalize">{org.config.billing_model?.replace('_', ' ')}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/40 col-span-2">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Services</p>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {(org.config.services || []).map(s => (
+                  <span key={s} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] rounded-full font-medium capitalize">{s.replace('_', ' ')}</span>
+                ))}
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/40">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Owner</p>
+              <p className="text-xs font-mono truncate">{org.owner_email}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Role Limits */}
+      <div className="erp-kpi-card space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" />
+            <div>
+              <h2 className="text-sm font-semibold">Role Limits</h2>
+              <p className="text-[10px] text-muted-foreground">Maximum number of users per role. Adjust as needed.</p>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {(Object.keys(roleLimits) as (keyof RoleLimits)[]).map(roleKey => {
+            const current = summary.roleCount[roleKey] || 0;
+            const limit = roleLimits[roleKey];
+            return (
+              <div key={roleKey} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/30">
+                <div>
+                  <p className="text-xs font-medium">{ROLE_LABELS[roleKey]}</p>
+                  <p className="text-[10px] text-muted-foreground">{current} / {limit} used</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => adjustRoleLimit(roleKey, -1)}
+                    className="w-6 h-6 rounded border border-border/60 flex items-center justify-center hover:bg-muted transition-colors"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <span className="erp-mono text-sm font-bold w-5 text-center">{limit}</span>
+                  <button
+                    onClick={() => adjustRoleLimit(roleKey, 1)}
+                    className="w-6 h-6 rounded border border-border/60 flex items-center justify-center hover:bg-muted transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         <div className="erp-kpi-card flex items-start gap-3"><div className="bg-primary/10 text-primary p-2 rounded-sm"><Users className="w-4 h-4" /></div><div><p className="text-xs text-muted-foreground">Total Users</p><p className="erp-mono text-lg font-bold">{summary.totalUsers}</p></div></div>
-        <div className="erp-kpi-card flex items-start gap-3"><div className="bg-blue-500/10 text-blue-500 p-2 rounded-sm"><UserCog className="w-4 h-4" /></div><div><p className="text-xs text-muted-foreground">Total Handlers</p><p className="erp-mono text-lg font-bold">{summary.totalHandlers}</p></div></div>
+        <div className="erp-kpi-card flex items-start gap-3"><div className="bg-primary/10 text-primary p-2 rounded-sm"><UserCog className="w-4 h-4" /></div><div><p className="text-xs text-muted-foreground">Total Handlers</p><p className="erp-mono text-lg font-bold">{summary.totalHandlers}</p></div></div>
       </div>
 
       <div className="erp-kpi-card space-y-2">
-        <h2 className="text-sm font-semibold">Role Distribution</h2>
-        <div className="grid grid-cols-3 gap-3 text-sm">
-          <div className="p-3 bg-red-500/10 rounded-sm"><p className="text-xs text-muted-foreground">Admin</p><p className="erp-mono font-bold">{summary.roleCount.admin}</p></div>
-          <div className="p-3 bg-blue-500/10 rounded-sm"><p className="text-xs text-muted-foreground">Handler</p><p className="erp-mono font-bold">{summary.roleCount.handler}</p></div>
-          <div className="p-3 bg-gray-500/10 rounded-sm"><p className="text-xs text-muted-foreground">Viewer</p><p className="erp-mono font-bold">{summary.roleCount.viewer}</p></div>
+        <h2 className="text-sm font-semibold">Role Distribution (Current)</h2>
+        <div className="grid grid-cols-5 gap-2 text-sm">
+          {(Object.keys(roleLimits) as (keyof RoleLimits)[]).map(roleKey => (
+            <div key={roleKey} className="p-3 bg-primary/5 rounded-sm text-center">
+              <p className="text-[10px] text-muted-foreground capitalize">{roleKey.replace('_', ' ')}</p>
+              <p className="erp-mono font-bold">{summary.roleCount[roleKey] || 0}</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -171,6 +293,11 @@ export default function Settings() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Platform footer */}
+      <div className="text-center py-4 border-t border-border/30">
+        <p className="text-[10px] text-muted-foreground">Finance Solver — F.S.001 • Created by Kota Associates</p>
       </div>
     </div>
   );
