@@ -1,10 +1,11 @@
-import { ShieldCheck, RotateCcw, Users, UserCog, Download, Upload, FileClock } from 'lucide-react';
+import { ShieldCheck, RotateCcw, Users, UserCog, Download, Upload, FileClock, Clock, HardDrive } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { miniDB, resetDB, loadDB, saveDB } from '@/lib/mini-supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useERP } from '@/lib/erp-store';
 import { playSyncSuccess, playError, playClick } from '@/lib/sound-engine';
+import { getBackupInterval, setBackupInterval, getLastBackupTime, type BackupInterval } from '@/lib/auto-backup';
 
 interface Summary {
   totalUsers: number;
@@ -18,9 +19,13 @@ export default function Settings() {
   const [summary, setSummary] = useState<Summary>(emptySummary);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [resetting, setResetting] = useState(false);
+  const [backupFreq, setBackupFreq] = useState<BackupInterval>(getBackupInterval());
   const { toast } = useToast();
   const { refreshData } = useERP();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const lastBackup = getLastBackupTime();
+  const lastBackupStr = lastBackup ? new Date(lastBackup).toLocaleString() : 'Never';
 
   const loadSummary = async () => {
     const [{ data: users }, { data: handlers }, { data: logs }] = await Promise.all([
@@ -79,6 +84,13 @@ export default function Settings() {
     toast({ title: 'Backup restored successfully' });
   };
 
+  const handleBackupFreqChange = (freq: BackupInterval) => {
+    setBackupFreq(freq);
+    setBackupInterval(freq);
+    playClick();
+    toast({ title: 'Auto-backup updated', description: freq === 'off' ? 'Auto-backup disabled.' : `Database will auto-export ${freq}.` });
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -97,6 +109,40 @@ export default function Settings() {
           <div className="p-3 bg-red-500/10 rounded-sm"><p className="text-xs text-muted-foreground">Admin</p><p className="erp-mono font-bold">{summary.roleCount.admin}</p></div>
           <div className="p-3 bg-blue-500/10 rounded-sm"><p className="text-xs text-muted-foreground">Handler</p><p className="erp-mono font-bold">{summary.roleCount.handler}</p></div>
           <div className="p-3 bg-gray-500/10 rounded-sm"><p className="text-xs text-muted-foreground">Viewer</p><p className="erp-mono font-bold">{summary.roleCount.viewer}</p></div>
+        </div>
+      </div>
+
+      {/* Auto-Backup Scheduler */}
+      <div className="erp-kpi-card space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-primary" />
+            <div>
+              <p className="text-sm font-semibold">Auto-Backup Scheduler</p>
+              <p className="text-xs text-muted-foreground">Automatically export database backup to downloads folder.</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            {(['off', 'daily', 'weekly'] as BackupInterval[]).map(freq => (
+              <button
+                key={freq}
+                onClick={() => handleBackupFreqChange(freq)}
+                className={`px-3 py-1.5 text-xs rounded-sm font-medium transition-colors ${
+                  backupFreq === freq
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {freq === 'off' ? 'Off' : freq === 'daily' ? 'Daily' : 'Weekly'}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <HardDrive className="w-3 h-3" />
+            <span>Last backup: {lastBackupStr}</span>
+          </div>
         </div>
       </div>
 

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, ChevronLeft,
-  ChevronRight, Building2, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
+  ChevronRight, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
   CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search, Plus
 } from 'lucide-react';
 import { useERP } from '@/lib/erp-store';
@@ -11,6 +11,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { getAvailableFYs, createFinancialYear } from '@/lib/mini-supabase';
 import { playClick } from '@/lib/sound-engine';
 import { useToast } from '@/hooks/use-toast';
+import { startAutoBackup } from '@/lib/auto-backup';
+import kaLogo from '@/assets/kota-associates-logo.png';
 
 const ADMIN_NAV = [
   { to: '/control-panel', icon: LayoutDashboard, label: 'Control Panel' },
@@ -73,6 +75,8 @@ export default function ERPLayout() {
   const { toast } = useToast();
   const availableFYs = getAvailableFYs();
 
+  useEffect(() => { startAutoBackup(); }, []);
+
   const { role } = useAuth();
   const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : role === 'fee_collector' ? FEE_COLLECTOR_NAV : HANDLER_NAV;
 
@@ -82,13 +86,11 @@ export default function ERPLayout() {
       <aside className={`erp-sidebar flex flex-col transition-all duration-300 ease-out ${collapsed ? 'w-[72px]' : 'w-64'} shrink-0 relative z-20`}>
         {/* Logo */}
         <div className="h-14 flex items-center gap-3 px-4 border-b border-sidebar-border/50">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0 shadow-lg hover:shadow-xl transition-shadow">
-            <Building2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img src={kaLogo} alt="Kota Associates" className="w-9 h-9 rounded-xl shrink-0 shadow-lg object-cover" />
           {!collapsed && (
             <div className="truncate animate-fade-in">
-              <div className="text-xs font-bold tracking-wider gradient-text">FINANCE SOLVER</div>
-              <div className="text-[10px] text-sidebar-foreground/40">Kota Associates V3</div>
+              <div className="text-xs font-bold tracking-wider gradient-text">KOTA ASSOCIATES</div>
+              <div className="text-[10px] text-sidebar-foreground/40">Finance Solver V3</div>
             </div>
           )}
         </div>
