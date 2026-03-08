@@ -6,6 +6,9 @@ export interface Organization {
   owner_email: string;
   created_at: string;
   config: OrgConfig;
+  // Organization-level credentials (Level 2 auth)
+  org_email: string;
+  org_password: string;
 }
 
 export interface OrgConfig {

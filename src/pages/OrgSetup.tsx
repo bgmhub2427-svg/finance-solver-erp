@@ -1,28 +1,35 @@
 import { useState } from 'react';
-import { Building2, ChevronRight, ChevronLeft, Check, Sparkles, Users, Minus, Plus } from 'lucide-react';
+import { Building2, ChevronRight, ChevronLeft, Check, X, Sparkles, Users, Minus, Plus, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrg } from '@/hooks/useOrg';
 import { useAuth } from '@/hooks/useAuth';
 import { miniAuth } from '@/lib/mini-supabase';
-import { SETUP_STEPS, deriveModules, defaultRoleLimits, ROLE_LABELS, type OrgConfig, type RoleLimits } from '@/lib/org-types';
+import { mainAuth } from '@/lib/main-auth';
+import { SETUP_STEPS, deriveModules, defaultRoleLimits, ROLE_LABELS, validatePassword, type OrgConfig, type RoleLimits } from '@/lib/org-types';
 import { playClick, playSuccess } from '@/lib/sound-engine';
+import { useToast } from '@/hooks/use-toast';
 import kaLogo from '@/assets/kota-associates-logo.png';
 
 export default function OrgSetup() {
   const { createOrg } = useOrg();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [orgName, setOrgName] = useState('');
+  const [orgEmail, setOrgEmail] = useState('');
+  const [orgPassword, setOrgPassword] = useState('');
+  const [showOrgPw, setShowOrgPw] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [roleLimits, setRoleLimits] = useState<RoleLimits>(defaultRoleLimits('6-20'));
 
-  // Steps: org name + setup questions + role limits
-  const totalSteps = SETUP_STEPS.length + 2;
+  // Steps: org name + org credentials + setup questions + role limits
+  const totalSteps = SETUP_STEPS.length + 3;
   const isNameStep = step === 0;
+  const isCredStep = step === 1;
   const isRoleStep = step === totalSteps - 1;
-  const setupStepIdx = step - 1;
-  const setupStep = !isNameStep && !isRoleStep && setupStepIdx >= 0 && setupStepIdx < SETUP_STEPS.length
+  const setupStepIdx = step - 2;
+  const setupStep = !isNameStep && !isCredStep && !isRoleStep && setupStepIdx >= 0 && setupStepIdx < SETUP_STEPS.length
     ? SETUP_STEPS[setupStepIdx]
     : null;
   const isMulti = (setupStep as any)?.multi === true;
@@ -53,8 +60,11 @@ export default function OrgSetup() {
     }));
   };
 
+  const orgPwCheck = validatePassword(orgPassword);
+
   const canProceed = () => {
     if (isNameStep) return orgName.trim().length >= 2;
+    if (isCredStep) return orgEmail.trim().length > 3 && orgPwCheck.valid;
     if (isRoleStep) return true;
     if (!setupStep) return false;
     const val = answers[setupStep.key];
@@ -92,7 +102,15 @@ export default function OrgSetup() {
       owner_email: user?.email || '',
       created_at: new Date().toISOString(),
       config,
+      org_email: orgEmail.trim(),
+      org_password: orgPassword,
     });
+
+    // Link org to main user account
+    const mainSession = mainAuth.getSession();
+    if (mainSession) {
+      mainAuth.linkOrgToUser(mainSession.id, orgId);
+    }
 
     if (user?.id) {
       miniAuth.updateUserOrgId(user.id, orgId);
@@ -141,6 +159,61 @@ export default function OrgSetup() {
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   This will be your company&apos;s display name in the ERP system.
                 </p>
+              </div>
+            </div>
+          ) : isCredStep ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium text-foreground">Set Organization Credentials</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                These credentials will be required to access this organization. Share them only with authorized team members.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Organization Email</label>
+                  <Input
+                    type="email"
+                    value={orgEmail}
+                    onChange={e => setOrgEmail(e.target.value)}
+                    placeholder="org@company.com"
+                    className="mt-1 h-11 rounded-xl"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Organization Password</label>
+                  <div className="relative">
+                    <Input
+                      type={showOrgPw ? 'text' : 'password'}
+                      value={orgPassword}
+                      onChange={e => setOrgPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="mt-1 h-11 rounded-xl pr-10"
+                    />
+                    <button type="button" onClick={() => setShowOrgPw(!showOrgPw)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showOrgPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {orgPassword.length > 0 && (
+                    <div className="grid grid-cols-2 gap-1 mt-1.5">
+                      {[
+                        { label: '8+ chars', ok: orgPassword.length >= 8 },
+                        { label: 'Uppercase', ok: /[A-Z]/.test(orgPassword) },
+                        { label: 'Lowercase', ok: /[a-z]/.test(orgPassword) },
+                        { label: 'Number', ok: /[0-9]/.test(orgPassword) },
+                        { label: 'Special', ok: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(orgPassword) },
+                      ].map(r => (
+                        <div key={r.label} className="flex items-center gap-1">
+                          {r.ok ? <Check className="w-3 h-3 text-[hsl(var(--success))]" /> : <X className="w-3 h-3 text-muted-foreground/40" />}
+                          <span className={`text-[10px] ${r.ok ? 'text-[hsl(var(--success))]' : 'text-muted-foreground/60'}`}>{r.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : isRoleStep ? (
