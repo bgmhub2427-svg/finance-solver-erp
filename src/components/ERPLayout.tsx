@@ -64,10 +64,14 @@ const VIEWER_NAV = [
 
 export default function ERPLayout() {
   const [collapsed, setCollapsed] = useState(false);
-  const { currentFY, setCurrentFY } = useERP();
+  const { currentFY, setCurrentFY, refreshData } = useERP();
   const { signOut, user, isAdmin, isViewer, handlerCode } = useAuth();
   const navigate = useNavigate();
   const [globalSearch, setGlobalSearch] = useState('');
+  const [showNewFY, setShowNewFY] = useState(false);
+  const [newFYInput, setNewFYInput] = useState('');
+  const { toast } = useToast();
+  const availableFYs = getAvailableFYs();
 
   const { role } = useAuth();
   const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : role === 'fee_collector' ? FEE_COLLECTOR_NAV : HANDLER_NAV;
