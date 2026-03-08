@@ -212,7 +212,7 @@ export function ERPProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, currentFY]);
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
