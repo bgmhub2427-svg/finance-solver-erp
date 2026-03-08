@@ -8,8 +8,10 @@ import type { ReactNode } from "react";
 import { ERPProvider } from "@/lib/erp-store";
 import { useDailyReportAutoSave } from "@/hooks/useDailyReportAutoSave";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { OrgProvider, useOrg } from "@/hooks/useOrg";
 import ERPLayout from "@/components/ERPLayout";
 import Auth from "./pages/Auth";
+import OrgSetup from "./pages/OrgSetup";
 import ControlPanel from "./pages/ControlPanel";
 import HandlerMaster from "./pages/HandlerMaster";
 import ClientMaster from "./pages/ClientMaster";
@@ -63,6 +65,21 @@ function NonViewerRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function ModuleRoute({ moduleId, children, adminOnly, nonViewer, adminOrViewer }: { 
+  moduleId: string; children: ReactNode; adminOnly?: boolean; nonViewer?: boolean; adminOrViewer?: boolean 
+}) {
+  const { enabledModules } = useOrg();
+  const { isAdmin, isViewer, loading, role } = useAuth();
+  
+  if (loading) return null;
+  if (!enabledModules.includes(moduleId)) return <Navigate to={getDefaultPath(role)} replace />;
+  if (adminOnly && !isAdmin) return <Navigate to={getDefaultPath(role)} replace />;
+  if (nonViewer && isViewer) return <Navigate to={getDefaultPath(role)} replace />;
+  if (adminOrViewer && !isAdmin && !isViewer) return <Navigate to={getDefaultPath(role)} replace />;
+  
+  return <>{children}</>;
+}
+
 function DailyReportRunner() {
   useDailyReportAutoSave();
   return null;
@@ -70,6 +87,7 @@ function DailyReportRunner() {
 
 function ProtectedRoutes() {
   const { user, loading, role } = useAuth();
+  const { isOrgSetupDone } = useOrg();
 
   if (loading)
     return (
@@ -82,6 +100,11 @@ function ProtectedRoutes() {
     );
 
   if (!user) return <Navigate to="/auth" replace />;
+
+  // If user has no org setup, show the setup wizard
+  if (!isOrgSetupDone) {
+    return <OrgSetup />;
+  }
 
   if (!role)
     return (
@@ -115,25 +138,25 @@ function ProtectedRoutes() {
       <Routes>
         <Route path="/" element={<Navigate to={getDefaultPath(role)} replace />} />
         <Route element={<ERPLayout />}>
-          <Route path="/control-panel" element={<ControlPanel />} />
-          <Route path="/collection-dashboard" element={<CollectionDashboard />} />
-          <Route path="/handler-master" element={<AdminRoute><HandlerMaster /></AdminRoute>} />
-          <Route path="/client-master" element={<NonViewerRoute><ClientMaster /></NonViewerRoute>} />
-          <Route path="/master-database" element={<AdminOrViewerRoute><MasterDatabase /></AdminOrViewerRoute>} />
-          <Route path="/payments" element={<PaymentTracking />} />
-          <Route path="/payment-pending" element={<PendingChecklist />} />
-          <Route path="/invoices" element={<NonViewerRoute><InvoiceManager /></NonViewerRoute>} />
-          <Route path="/invoice-database" element={<AdminOrViewerRoute><InvoiceDatabase /></AdminOrViewerRoute>} />
-          <Route path="/reports" element={<AdminOrViewerRoute><Reports /></AdminOrViewerRoute>} />
-          <Route path="/advanced-reports" element={<AdminOrViewerRoute><AdvancedReports /></AdminOrViewerRoute>} />
-          <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
-          <Route path="/upload-sync" element={<NonViewerRoute><UploadSync /></NonViewerRoute>} />
-          <Route path="/approvals" element={<AdminRoute><Approvals /></AdminRoute>} />
-          <Route path="/month-lock" element={<AdminRoute><MonthLock /></AdminRoute>} />
-          <Route path="/audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
-          <Route path="/risk-detection" element={<AdminRoute><RiskDetection /></AdminRoute>} />
-          <Route path="/ai-planner" element={<AIPlanner />} />
-          <Route path="/excel-master-sync" element={<AdminRoute><ExcelMasterSync /></AdminRoute>} />
+          <Route path="/control-panel" element={<ModuleRoute moduleId="control-panel"><ControlPanel /></ModuleRoute>} />
+          <Route path="/collection-dashboard" element={<ModuleRoute moduleId="collection-dashboard"><CollectionDashboard /></ModuleRoute>} />
+          <Route path="/handler-master" element={<ModuleRoute moduleId="handler-master" adminOnly><HandlerMaster /></ModuleRoute>} />
+          <Route path="/client-master" element={<ModuleRoute moduleId="client-master" nonViewer><ClientMaster /></ModuleRoute>} />
+          <Route path="/master-database" element={<ModuleRoute moduleId="master-database" adminOrViewer><MasterDatabase /></ModuleRoute>} />
+          <Route path="/payments" element={<ModuleRoute moduleId="payments"><PaymentTracking /></ModuleRoute>} />
+          <Route path="/payment-pending" element={<ModuleRoute moduleId="payment-pending"><PendingChecklist /></ModuleRoute>} />
+          <Route path="/invoices" element={<ModuleRoute moduleId="invoices" nonViewer><InvoiceManager /></ModuleRoute>} />
+          <Route path="/invoice-database" element={<ModuleRoute moduleId="invoice-database" adminOrViewer><InvoiceDatabase /></ModuleRoute>} />
+          <Route path="/reports" element={<ModuleRoute moduleId="reports" adminOrViewer><Reports /></ModuleRoute>} />
+          <Route path="/advanced-reports" element={<ModuleRoute moduleId="advanced-reports" adminOrViewer><AdvancedReports /></ModuleRoute>} />
+          <Route path="/upload-sync" element={<ModuleRoute moduleId="upload-sync" nonViewer><UploadSync /></ModuleRoute>} />
+          <Route path="/approvals" element={<ModuleRoute moduleId="approvals" adminOnly><Approvals /></ModuleRoute>} />
+          <Route path="/month-lock" element={<ModuleRoute moduleId="month-lock" adminOnly><MonthLock /></ModuleRoute>} />
+          <Route path="/audit-log" element={<ModuleRoute moduleId="audit-log" adminOnly><AuditLog /></ModuleRoute>} />
+          <Route path="/risk-detection" element={<ModuleRoute moduleId="risk-detection" adminOnly><RiskDetection /></ModuleRoute>} />
+          <Route path="/ai-planner" element={<ModuleRoute moduleId="ai-planner"><AIPlanner /></ModuleRoute>} />
+          <Route path="/excel-master-sync" element={<ModuleRoute moduleId="excel-master-sync" adminOnly><ExcelMasterSync /></ModuleRoute>} />
+          <Route path="/settings" element={<ModuleRoute moduleId="settings" adminOnly><Settings /></ModuleRoute>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -153,19 +176,20 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <HashRouter>
-            <Toaster />
-            <Sonner />
-            <Routes>
-              <Route path="/auth" element={<AuthGate />} />
-              <Route path="/*" element={<ProtectedRoutes />} />
-            </Routes>
-          </HashRouter>
+          <OrgProvider>
+            <HashRouter>
+              <Toaster />
+              <Sonner />
+              <Routes>
+                <Route path="/auth" element={<AuthGate />} />
+                <Route path="/*" element={<ProtectedRoutes />} />
+              </Routes>
+            </HashRouter>
+          </OrgProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
 }
-
 
 export default App;

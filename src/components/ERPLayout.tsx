@@ -4,70 +4,31 @@ import {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, ChevronLeft,
   ChevronRight, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
-  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search, Plus
+  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search, Plus, Building2
 } from 'lucide-react';
 import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrg } from '@/hooks/useOrg';
 import { getAvailableFYs, createFinancialYear } from '@/lib/mini-supabase';
 import { playClick } from '@/lib/sound-engine';
 import { useToast } from '@/hooks/use-toast';
 import { startAutoBackup } from '@/lib/auto-backup';
+import { ALL_MODULES, type ModuleDef } from '@/lib/org-types';
 import kaLogo from '@/assets/kota-associates-logo.png';
 
-const ADMIN_NAV = [
-  { to: '/control-panel', icon: LayoutDashboard, label: 'Control Panel' },
-  { to: '/collection-dashboard', icon: Calendar, label: 'Collection Dashboard' },
-  { to: '/handler-master', icon: UserCog, label: 'Handler Master' },
-  { to: '/client-master', icon: Users, label: 'Client Master' },
-  { to: '/master-database', icon: Database, label: 'Master Database' },
-  { to: '/payments', icon: IndianRupee, label: 'Payment Tracking' },
-  { to: '/payment-pending', icon: ClipboardCheck, label: 'Pending Checklist' },
-  { to: '/invoices', icon: FileText, label: 'Invoice Manager' },
-  { to: '/upload-sync', icon: Receipt, label: 'Upload Sync' },
-  { to: '/approvals', icon: CheckSquare, label: 'Approvals' },
-  { to: '/invoice-database', icon: FileSpreadsheet, label: 'Invoice Database' },
-  { to: '/reports', icon: TrendingUp, label: 'Reports' },
-  { to: '/advanced-reports', icon: TrendingUp, label: 'Advanced Analytics' },
-  { to: '/risk-detection', icon: ShieldAlert, label: 'Risk Detection' },
-  { to: '/ai-planner', icon: Brain, label: 'AI Collection Planner' },
-  { to: '/excel-master-sync', icon: Download, label: 'Excel Master Sync' },
-  { to: '/month-lock', icon: Lock, label: 'Month Lock' },
-  { to: '/audit-log', icon: ScrollText, label: 'Audit Log' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-];
-
-const HANDLER_NAV = [
-  { to: '/control-panel', icon: LayoutDashboard, label: 'My Dashboard' },
-  { to: '/collection-dashboard', icon: Calendar, label: 'Collection Dashboard' },
-  { to: '/client-master', icon: Users, label: 'My Clients' },
-  { to: '/payments', icon: IndianRupee, label: 'Payment Tracking' },
-  { to: '/payment-pending', icon: ClipboardCheck, label: 'Pending Checklist' },
-  { to: '/invoices', icon: FileText, label: 'Invoice Manager' },
-  { to: '/upload-sync', icon: Receipt, label: 'Upload Sync' },
-  { to: '/ai-planner', icon: Brain, label: 'AI Collection Planner' },
-];
-
-const FEE_COLLECTOR_NAV = [
-  { to: '/payments', icon: IndianRupee, label: 'Payment Tracking' },
-  { to: '/payment-pending', icon: ClipboardCheck, label: 'Pending Checklist' },
-  { to: '/upload-sync', icon: Receipt, label: 'Upload Sync' },
-];
-
-const VIEWER_NAV = [
-  { to: '/master-database', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/collection-dashboard', icon: Calendar, label: 'Collection Dashboard' },
-  { to: '/master-database', icon: Database, label: 'Master Database' },
-  { to: '/payments', icon: IndianRupee, label: 'Payment Tracking' },
-  { to: '/payment-pending', icon: ClipboardCheck, label: 'Pending Checklist' },
-  { to: '/invoice-database', icon: FileSpreadsheet, label: 'Invoice Database' },
-  { to: '/reports', icon: TrendingUp, label: 'Reports' },
-  { to: '/advanced-reports', icon: TrendingUp, label: 'Advanced Analytics' },
-];
+// Icon mapping
+const ICON_MAP: Record<string, React.ElementType> = {
+  LayoutDashboard, Users, UserCog, Database, IndianRupee,
+  Receipt, FileText, ClipboardCheck, Settings, TrendingUp,
+  FileSpreadsheet, CheckSquare, Lock, ScrollText, Calendar,
+  ShieldAlert, Brain, Download,
+};
 
 export default function ERPLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentFY, setCurrentFY, refreshData } = useERP();
-  const { signOut, user, isAdmin, isViewer, handlerCode } = useAuth();
+  const { signOut, user, isAdmin, isViewer, handlerCode, role } = useAuth();
+  const { org, enabledModules } = useOrg();
   const navigate = useNavigate();
   const [globalSearch, setGlobalSearch] = useState('');
   const [showNewFY, setShowNewFY] = useState(false);
@@ -77,8 +38,33 @@ export default function ERPLayout() {
 
   useEffect(() => { startAutoBackup(); }, []);
 
-  const { role } = useAuth();
-  const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : role === 'fee_collector' ? FEE_COLLECTOR_NAV : HANDLER_NAV;
+  // Build dynamic nav from enabled modules
+  const navItems = ALL_MODULES
+    .filter(m => enabledModules.includes(m.id))
+    .filter(m => {
+      // Role-based filtering
+      if (m.adminOnly && !isAdmin) return false;
+      if (m.nonViewer && isViewer) return false;
+      if (m.adminOrViewer && !isAdmin && !isViewer) return false;
+      // Fee collector only sees specific modules
+      if (role === 'fee_collector') {
+        return ['payments', 'payment-pending', 'upload-sync'].includes(m.id);
+      }
+      // Handler sees subset
+      if (role === 'handler') {
+        return !['handler-master', 'master-database', 'invoice-database', 'approvals',
+          'month-lock', 'audit-log', 'risk-detection', 'excel-master-sync', 'settings',
+          'reports', 'advanced-reports'].includes(m.id);
+      }
+      return true;
+    })
+    .map(m => ({
+      to: m.path,
+      icon: ICON_MAP[m.icon] || LayoutDashboard,
+      label: m.label,
+    }));
+
+  const orgName = org?.name || 'Finance Solver';
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -86,11 +72,13 @@ export default function ERPLayout() {
       <aside className={`erp-sidebar flex flex-col transition-all duration-300 ease-out ${collapsed ? 'w-[72px]' : 'w-64'} shrink-0 relative z-20`}>
         {/* Logo */}
         <div className="h-14 flex items-center gap-3 px-4 border-b border-sidebar-border/50">
-          <img src={kaLogo} alt="Kota Associates" className="w-9 h-9 rounded-xl shrink-0 shadow-lg object-cover" />
+          <div className="w-9 h-9 rounded-xl shrink-0 shadow-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-primary-foreground" />
+          </div>
           {!collapsed && (
             <div className="truncate animate-fade-in">
-              <div className="text-xs font-bold tracking-wider gradient-text">KOTA ASSOCIATES</div>
-              <div className="text-[10px] text-sidebar-foreground/40">Finance Solver V3</div>
+              <div className="text-xs font-bold tracking-wider gradient-text truncate">{orgName.toUpperCase()}</div>
+              <div className="text-[10px] text-sidebar-foreground/40">Finance Solver ERP</div>
             </div>
           )}
         </div>
@@ -156,7 +144,7 @@ export default function ERPLayout() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary opacity-60" />
-              <span className="text-xs opacity-50 font-medium">Finance Solver ERP — LTSC Kota Associates V3</span>
+              <span className="text-xs opacity-50 font-medium">{orgName} — Finance Solver ERP</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
