@@ -95,15 +95,6 @@ function ensureGlobalFields(g: any): GlobalData {
   for (const key of GLOBAL_FIELDS) {
     if (!Array.isArray(merged[key])) merged[key] = (defaults as any)[key];
   }
-  const existingEmails = new Set((merged.users as MiniUser[]).map(u => u.email.toLowerCase()));
-  for (const du of defaults.users) {
-    if (!existingEmails.has(du.email.toLowerCase())) merged.users.push(du);
-  }
-  for (const user of merged.users as MiniUser[]) {
-    if (isAdminEmail(user.email) && user.role !== 'admin') user.role = 'admin';
-    // Ensure legacy users have org_id
-    if (!user.org_id && isAdminEmail(user.email)) user.org_id = 'default';
-  }
   return merged as GlobalData;
 }
 
