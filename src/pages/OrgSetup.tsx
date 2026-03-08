@@ -102,7 +102,15 @@ export default function OrgSetup() {
       owner_email: user?.email || '',
       created_at: new Date().toISOString(),
       config,
+      org_email: orgEmail.trim(),
+      org_password: orgPassword,
     });
+
+    // Link org to main user account
+    const mainSession = mainAuth.getSession();
+    if (mainSession) {
+      mainAuth.linkOrgToUser(mainSession.id, orgId);
+    }
 
     if (user?.id) {
       miniAuth.updateUserOrgId(user.id, orgId);
