@@ -75,6 +75,8 @@ export default function ERPLayout() {
   const { toast } = useToast();
   const availableFYs = getAvailableFYs();
 
+  useEffect(() => { startAutoBackup(); }, []);
+
   const { role } = useAuth();
   const navItems = isAdmin ? ADMIN_NAV : isViewer ? VIEWER_NAV : role === 'fee_collector' ? FEE_COLLECTOR_NAV : HANDLER_NAV;
 
