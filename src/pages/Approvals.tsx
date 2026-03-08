@@ -6,7 +6,7 @@ import { loadDB, saveDB, genId } from '@/lib/mini-supabase/mini-db';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { playApproved } from "@/lib/sound-engine";
+import { playApproved, playError, playClick } from "@/lib/sound-engine";
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
