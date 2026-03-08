@@ -1,5 +1,6 @@
 // Main user accounts - top-level identity layer (Level 1)
 import { validatePassword } from '@/lib/org-types';
+import { loadDB } from '@/lib/mini-supabase/mini-db';
 
 export interface MainUser {
   id: string;
