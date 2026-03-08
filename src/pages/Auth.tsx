@@ -30,7 +30,7 @@ export default function Auth() {
 
   // One-time reset: clear all demo/test data so user starts fresh
   useEffect(() => {
-    const RESET_FLAG = 'erp_fresh_reset_v2';
+    const RESET_FLAG = 'erp_fresh_reset_v3';
     if (!localStorage.getItem(RESET_FLAG)) {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
