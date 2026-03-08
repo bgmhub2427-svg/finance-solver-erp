@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { miniDB, resetDB, loadDB, saveDB } from '@/lib/mini-supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useERP } from '@/lib/erp-store';
+import { playSyncSuccess, playError, playClick } from '@/lib/sound-engine';
 
 interface Summary {
   totalUsers: number;
