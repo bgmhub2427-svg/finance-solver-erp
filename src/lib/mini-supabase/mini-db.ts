@@ -61,13 +61,7 @@ const FY_FIELDS: (keyof ERPDatabase)[] = [
 
 function defaultGlobal(): GlobalData {
   return {
-    users: [
-      { id: uid(), email: 'admin@ka.com', password: 'Ka@2026!x', role: 'admin', handler_id: null, org_id: 'default' },
-      { id: uid(), email: 'suneelkumarkota@admin.com', password: 'KA@SKK@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
-      { id: uid(), email: 'saikarthikkota@admin.com', password: 'KA@SKBSK@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
-      { id: uid(), email: 'jana@admin.com', password: 'KA@JA@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
-      { id: uid(), email: 'manohar@admin.com', password: 'KA@M@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
-    ],
+    users: [],
     handlers: [],
     audit_logs: [],
   };
