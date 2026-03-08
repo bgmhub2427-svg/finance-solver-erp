@@ -89,6 +89,16 @@ export function deriveModules(config: Partial<OrgConfig>): string[] {
   return [...new Set(modules)];
 }
 
+export function defaultRoleLimits(teamSize: string): RoleLimits {
+  switch (teamSize) {
+    case '1-5': return { admin: 1, manager: 1, handler: 3, viewer: 2, fee_collector: 1 };
+    case '6-20': return { admin: 2, manager: 3, handler: 10, viewer: 5, fee_collector: 3 };
+    case '21-50': return { admin: 3, manager: 5, handler: 30, viewer: 10, fee_collector: 5 };
+    case '50+': return { admin: 5, manager: 10, handler: 50, viewer: 20, fee_collector: 10 };
+    default: return { admin: 2, manager: 3, handler: 10, viewer: 5, fee_collector: 3 };
+  }
+}
+
 export function defaultOrgConfig(): OrgConfig {
   return {
     org_type: 'ca_firm',
@@ -98,6 +108,7 @@ export function defaultOrgConfig(): OrgConfig {
     roles: ['admin', 'manager', 'handler', 'viewer', 'fee_collector'],
     payment_structure: 'variable',
     enabled_modules: ALL_MODULES.map(m => m.id),
+    role_limits: defaultRoleLimits('6-20'),
   };
 }
 
