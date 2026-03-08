@@ -43,6 +43,12 @@ const HANDLER_NAV = [
   { to: '/ai-planner', icon: Brain, label: 'AI Collection Planner' },
 ];
 
+const FEE_COLLECTOR_NAV = [
+  { to: '/payments', icon: IndianRupee, label: 'Payment Tracking' },
+  { to: '/payment-pending', icon: ClipboardCheck, label: 'Pending Checklist' },
+  { to: '/upload-sync', icon: Receipt, label: 'Upload Sync' },
+];
+
 const VIEWER_NAV = [
   { to: '/master-database', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/collection-dashboard', icon: Calendar, label: 'Collection Dashboard' },
