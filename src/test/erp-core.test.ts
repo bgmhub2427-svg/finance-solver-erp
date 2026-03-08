@@ -47,10 +47,10 @@ describe('Mini-Supabase Core', () => {
   describe('Authentication', () => {
     it('should sign up a new user', async () => {
       await resetDB();
-      const res = await miniAuth.signUp('testuser@example.com', 'Test@123');
+      const res = await miniAuth.signUp('testuser@example.com', 'Test@123!Ab');
       expect(res.error).toBeNull();
       expect(res.data?.user.email).toBe('testuser@example.com');
-      expect(res.data?.user.role).toBe('viewer'); // non-admin default
+      expect(res.data?.user.role).toBe('admin'); // new signups are org admins
     });
 
     it('should assign admin role to admin emails on signup', async () => {
