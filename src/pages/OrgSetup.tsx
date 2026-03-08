@@ -60,8 +60,11 @@ export default function OrgSetup() {
     }));
   };
 
+  const orgPwCheck = validatePassword(orgPassword);
+
   const canProceed = () => {
     if (isNameStep) return orgName.trim().length >= 2;
+    if (isCredStep) return orgEmail.trim().length > 3 && orgPwCheck.valid;
     if (isRoleStep) return true;
     if (!setupStep) return false;
     const val = answers[setupStep.key];
