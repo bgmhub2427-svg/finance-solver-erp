@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { miniAuth } from '@/lib/mini-supabase';
 import { mainAuth, type MainUser } from '@/lib/main-auth';
 import { LogIn, UserPlus, Shield, Eye, EyeOff, Check, X, ArrowLeft, Building2, KeyRound, Users } from 'lucide-react';
