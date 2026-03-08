@@ -46,8 +46,10 @@ export default function Settings() {
       await resetDB();
       await refreshData();
       await loadSummary();
+      playSyncSuccess();
       toast({ title: 'Database reset complete', description: 'ERP database reset to default seed data.' });
     } catch (err: any) {
+      playError();
       toast({ title: 'Reset failed', description: err.message, variant: 'destructive' });
     } finally {
       setResetting(false);
