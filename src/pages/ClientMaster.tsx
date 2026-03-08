@@ -226,6 +226,10 @@ export default function ClientMaster() {
                   <label className="text-xs text-muted-foreground">New Fee Due (₹)</label>
                   <Input type="number" value={form.newFeeDue} onChange={e => setForm({ ...form, newFeeDue: +e.target.value })} />
                 </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Previous Year Pending (₹)</label>
+                  <Input type="number" value={form.previousYearPending} onChange={e => setForm({ ...form, previousYearPending: +e.target.value })} placeholder="0" />
+                </div>
 
                 {/* Pending Tracking Fields */}
                 <div className="col-span-2 border-t pt-2 mt-1">
