@@ -75,6 +75,7 @@ export default function Settings() {
     await saveDB(parsed);
     await refreshData();
     await loadSummary();
+    playSyncSuccess();
     toast({ title: 'Backup restored successfully' });
   };
 

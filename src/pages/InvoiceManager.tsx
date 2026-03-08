@@ -126,7 +126,7 @@ export default function InvoiceManager() {
           <p className="text-xs text-muted-foreground mt-0.5">{fyInvoices.length} Invoices — FY {currentFY} — No GST</p>
         </div>
         {!isViewer && (
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) playClick(); }}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1"><Plus className="w-3.5 h-3.5" /> Generate Invoice</Button>
             </DialogTrigger>

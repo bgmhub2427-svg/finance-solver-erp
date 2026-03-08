@@ -132,9 +132,11 @@ export default function ClientMaster() {
     setEditSaving(true);
     try {
       await updateClient(editClient.id, editForm);
+      playSuccess();
       toast({ title: 'Client updated successfully' });
       setEditClient(null);
     } catch (err: any) {
+      playError();
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setEditSaving(false);

@@ -138,6 +138,7 @@ export default function Approvals() {
     try {
       await updatePaymentStatus(id, 'rejected', reason || 'Rejected by admin');
       await refreshData();
+      playError();
       toast({ title: 'Rejected', description: `Payment rejected` });
       setSelected(s => { const n = new Set(s); n.delete(id); return n; });
     } finally {
