@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, ChevronLeft,
   ChevronRight, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
-  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search, Plus, Building2
+  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Search, Plus
 } from 'lucide-react';
 import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,10 +13,9 @@ import { getAvailableFYs, createFinancialYear } from '@/lib/mini-supabase';
 import { playClick } from '@/lib/sound-engine';
 import { useToast } from '@/hooks/use-toast';
 import { startAutoBackup } from '@/lib/auto-backup';
-import { ALL_MODULES, type ModuleDef } from '@/lib/org-types';
+import { ALL_MODULES } from '@/lib/org-types';
 import kaLogo from '@/assets/kota-associates-logo.png';
 
-// Icon mapping
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, TrendingUp,
@@ -38,19 +37,15 @@ export default function ERPLayout() {
 
   useEffect(() => { startAutoBackup(); }, []);
 
-  // Build dynamic nav from enabled modules
   const navItems = ALL_MODULES
     .filter(m => enabledModules.includes(m.id))
     .filter(m => {
-      // Role-based filtering
       if (m.adminOnly && !isAdmin) return false;
       if (m.nonViewer && isViewer) return false;
       if (m.adminOrViewer && !isAdmin && !isViewer) return false;
-      // Fee collector only sees specific modules
       if (role === 'fee_collector') {
         return ['payments', 'payment-pending', 'upload-sync'].includes(m.id);
       }
-      // Handler sees subset
       if (role === 'handler') {
         return !['handler-master', 'master-database', 'invoice-database', 'approvals',
           'month-lock', 'audit-log', 'risk-detection', 'excel-master-sync', 'settings',
@@ -68,22 +63,19 @@ export default function ERPLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar */}
       <aside className={`erp-sidebar flex flex-col transition-all duration-300 ease-out ${collapsed ? 'w-[72px]' : 'w-64'} shrink-0 relative z-20`}>
         {/* Logo */}
-        <div className="h-14 flex items-center gap-3 px-4 border-b border-sidebar-border/50">
-          <div className="w-9 h-9 rounded-xl shrink-0 shadow-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+        <div className="h-16 flex items-center gap-3 px-3 border-b border-sidebar-border/50">
+          <img src={kaLogo} alt="Kota Associates" className="w-10 h-10 rounded-xl shrink-0 shadow-lg object-contain" />
           {!collapsed && (
             <div className="truncate animate-fade-in">
               <div className="text-xs font-bold tracking-wider gradient-text truncate">{orgName.toUpperCase()}</div>
-              <div className="text-[10px] text-sidebar-foreground/40">Finance Solver ERP</div>
+              <div className="text-[9px] text-sidebar-foreground/40 font-mono">Finance Solver — F.S.001</div>
             </div>
           )}
         </div>
 
-        {/* Role Badge */}
+        {/* Role & Credentials */}
         {!collapsed && (
           <div className="px-4 py-3 border-b border-sidebar-border/50 animate-fade-in">
             <div className="flex items-center gap-2">
@@ -97,6 +89,11 @@ export default function ERPLayout() {
               </span>
             </div>
             <p className="text-[9px] text-sidebar-foreground/30 truncate mt-1 font-mono">{user?.email}</p>
+            {org && (
+              <p className="text-[8px] text-sidebar-foreground/20 truncate mt-0.5 font-mono">
+                Org: {org.slug} • {org.config?.org_type?.replace('_', ' ')}
+              </p>
+            )}
           </div>
         )}
 
@@ -128,6 +125,13 @@ export default function ERPLayout() {
           {!collapsed && <span className="font-medium">Sign Out</span>}
         </button>
 
+        {/* Branding footer */}
+        {!collapsed && (
+          <div className="px-4 py-2 border-t border-sidebar-border/30 text-center">
+            <p className="text-[8px] text-sidebar-foreground/20">Created by Kota Associates</p>
+          </div>
+        )}
+
         {/* Collapse */}
         <button
           onClick={() => { setCollapsed(!collapsed); playClick(); }}
@@ -137,14 +141,12 @@ export default function ERPLayout() {
         </button>
       </aside>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
         <header className="erp-header-bar justify-between shrink-0 relative z-10">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary opacity-60" />
-              <span className="text-xs opacity-50 font-medium">{orgName} — Finance Solver ERP</span>
+              <img src={kaLogo} alt="" className="w-5 h-5 rounded object-contain opacity-60" />
+              <span className="text-xs opacity-50 font-medium">{orgName} — Finance Solver F.S.001</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -219,7 +221,6 @@ export default function ERPLayout() {
           </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-auto p-6 bg-background dot-grid">
           <div className="animate-fade-in">
             <Outlet />

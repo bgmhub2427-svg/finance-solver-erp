@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { miniAuth } from '@/lib/mini-supabase';
-import { Building2, LogIn, UserPlus, Shield, Sparkles, Eye, EyeOff, Check, X } from 'lucide-react';
+import { LogIn, UserPlus, Shield, Eye, EyeOff, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -61,16 +61,12 @@ export default function Auth() {
           {/* Logo */}
           <div className="text-center space-y-3">
             <div className="relative inline-block">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center animate-float shadow-lg">
-                <Building2 className="w-8 h-8 text-primary-foreground" />
-              </div>
-              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent flex items-center justify-center animate-glow">
-                <Sparkles className="w-3 h-3 text-accent-foreground" />
-              </div>
+              <img src={kaLogo} alt="Kota Associates" className="w-20 h-20 mx-auto rounded-2xl shadow-lg object-contain animate-float" />
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight gradient-text">Finance Solver</h1>
-              <p className="text-xs text-muted-foreground mt-1">Enterprise ERP Platform — Any Organization</p>
+              <p className="text-[11px] font-semibold tracking-[0.25em] text-muted-foreground mt-0.5">F.S.001</p>
+              <p className="text-xs text-muted-foreground mt-1">Enterprise ERP Platform — Multi-Organization</p>
             </div>
             <p className="text-sm font-medium text-foreground/80">{isLogin ? 'Welcome Back' : 'Create Your Organization'}</p>
           </div>
@@ -108,7 +104,6 @@ export default function Auth() {
                 </button>
               </div>
 
-              {/* Password strength indicator for signup */}
               {!isLogin && password.length > 0 && (
                 <div className="space-y-1 mt-2">
                   <div className="flex gap-1">
@@ -172,6 +167,9 @@ export default function Auth() {
             </div>
             <p className="text-[10px] text-muted-foreground text-center">
               Min 8 chars with uppercase, lowercase, number &amp; special character
+            </p>
+            <p className="text-[9px] text-muted-foreground/40 text-center mt-2">
+              Finance Solver — F.S.001 • Created by Kota Associates
             </p>
           </div>
         </div>
