@@ -62,7 +62,7 @@ describe('Mini-Supabase Core', () => {
 
     it('should sign in with valid credentials', async () => {
       await resetDB();
-      const res = await miniAuth.signIn('admin@ka.com', 'Ka@2026');
+      const res = await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
       expect(res.error).toBeNull();
       expect(res.data?.user.role).toBe('admin');
     });
