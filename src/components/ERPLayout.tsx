@@ -4,12 +4,13 @@ import {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, ChevronLeft,
   ChevronRight, Building2, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
-  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search
+  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search, Plus
 } from 'lucide-react';
 import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
-import { FINANCIAL_YEARS } from '@/lib/erp-types';
+import { getAvailableFYs, createFinancialYear } from '@/lib/mini-supabase';
 import { playClick } from '@/lib/sound-engine';
+import { useToast } from '@/hooks/use-toast';
 
 const ADMIN_NAV = [
   { to: '/control-panel', icon: LayoutDashboard, label: 'Control Panel' },
