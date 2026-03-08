@@ -441,7 +441,7 @@ describe('Mini-Supabase Core', () => {
       await miniAuth.signOut();
 
       // Need to reload as admin to check
-      await miniAuth.signIn('admin@ka.com', 'Ka@2026');
+      await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
       const db = await loadDB();
       const logoutLogs = db.audit_logs.filter((l: any) => l.action === 'logout');
       expect(logoutLogs.length).toBeGreaterThanOrEqual(1);
