@@ -35,16 +35,11 @@ export interface ERPDatabase {
   fraud_alerts: Record<string, any>[];
 }
 
-const ADMIN_EMAILS = [
-  'admin@ka.com',
-  'suneelkumarkota@admin.com',
-  'saikarthikkota@admin.com',
-  'jana@admin.com',
-  'manohar@admin.com',
-];
+// Admin emails are now dynamic per-organization — no hardcoded list
+const ADMIN_EMAILS: string[] = [];
 
-export function isAdminEmail(email: string): boolean {
-  return ADMIN_EMAILS.includes(email.toLowerCase());
+export function isAdminEmail(_email: string): boolean {
+  return false; // No hardcoded admins — roles are assigned during org setup
 }
 
 const uid = () => (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
@@ -66,13 +61,7 @@ const FY_FIELDS: (keyof ERPDatabase)[] = [
 
 function defaultGlobal(): GlobalData {
   return {
-    users: [
-      { id: uid(), email: 'admin@ka.com', password: 'Ka@2026!x', role: 'admin', handler_id: null, org_id: 'default' },
-      { id: uid(), email: 'suneelkumarkota@admin.com', password: 'KA@SKK@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
-      { id: uid(), email: 'saikarthikkota@admin.com', password: 'KA@SKBSK@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
-      { id: uid(), email: 'jana@admin.com', password: 'KA@JA@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
-      { id: uid(), email: 'manohar@admin.com', password: 'KA@M@fee.123', role: 'admin', handler_id: null, org_id: 'default' },
-    ],
+    users: [],
     handlers: [],
     audit_logs: [],
   };
@@ -105,15 +94,6 @@ function ensureGlobalFields(g: any): GlobalData {
   const merged: any = { ...g };
   for (const key of GLOBAL_FIELDS) {
     if (!Array.isArray(merged[key])) merged[key] = (defaults as any)[key];
-  }
-  const existingEmails = new Set((merged.users as MiniUser[]).map(u => u.email.toLowerCase()));
-  for (const du of defaults.users) {
-    if (!existingEmails.has(du.email.toLowerCase())) merged.users.push(du);
-  }
-  for (const user of merged.users as MiniUser[]) {
-    if (isAdminEmail(user.email) && user.role !== 'admin') user.role = 'admin';
-    // Ensure legacy users have org_id
-    if (!user.org_id && isAdminEmail(user.email)) user.org_id = 'default';
   }
   return merged as GlobalData;
 }

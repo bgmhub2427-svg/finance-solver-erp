@@ -1,35 +1,44 @@
 import { useState } from 'react';
-import { Building2, ChevronRight, ChevronLeft, Check, X, Sparkles, Users, Minus, Plus, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Building2, ChevronRight, ChevronLeft, Check, X, Sparkles, Users, Minus, Plus, KeyRound, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrg } from '@/hooks/useOrg';
-import { useAuth } from '@/hooks/useAuth';
 import { miniAuth } from '@/lib/mini-supabase';
-import { mainAuth } from '@/lib/main-auth';
+import { mainAuth, type MainUser } from '@/lib/main-auth';
 import { SETUP_STEPS, deriveModules, defaultRoleLimits, ROLE_LABELS, validatePassword, type OrgConfig, type RoleLimits } from '@/lib/org-types';
 import { playClick, playSuccess } from '@/lib/sound-engine';
 import { useToast } from '@/hooks/use-toast';
 import kaLogo from '@/assets/kota-associates-logo.png';
 
-export default function OrgSetup() {
+interface OrgSetupProps {
+  mainUser?: MainUser | null;
+  onComplete?: () => void;
+  onBack?: () => void;
+}
+
+export default function OrgSetup({ mainUser: mainUserProp, onComplete, onBack }: OrgSetupProps) {
   const { createOrg } = useOrg();
-  const { user } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [orgName, setOrgName] = useState('');
   const [orgEmail, setOrgEmail] = useState('');
   const [orgPassword, setOrgPassword] = useState('');
   const [showOrgPw, setShowOrgPw] = useState(false);
+  // Admin user credentials for the organization
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPw, setShowAdminPw] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [roleLimits, setRoleLimits] = useState<RoleLimits>(defaultRoleLimits('6-20'));
 
-  // Steps: org name + org credentials + setup questions + role limits
-  const totalSteps = SETUP_STEPS.length + 3;
+  // Steps: org name + org credentials + admin user setup + setup questions + role limits
+  const totalSteps = SETUP_STEPS.length + 4;
   const isNameStep = step === 0;
   const isCredStep = step === 1;
+  const isAdminStep = step === 2;
   const isRoleStep = step === totalSteps - 1;
-  const setupStepIdx = step - 2;
-  const setupStep = !isNameStep && !isCredStep && !isRoleStep && setupStepIdx >= 0 && setupStepIdx < SETUP_STEPS.length
+  const setupStepIdx = step - 3;
+  const setupStep = !isNameStep && !isCredStep && !isAdminStep && !isRoleStep && setupStepIdx >= 0 && setupStepIdx < SETUP_STEPS.length
     ? SETUP_STEPS[setupStepIdx]
     : null;
   const isMulti = (setupStep as any)?.multi === true;
@@ -45,7 +54,6 @@ export default function OrgSetup() {
       setAnswers({ ...answers, [setupStep.key]: updated });
     } else {
       setAnswers({ ...answers, [setupStep.key]: value });
-      // Auto-update role limits when team size changes
       if (setupStep.key === 'team_size') {
         setRoleLimits(defaultRoleLimits(value));
       }
@@ -61,10 +69,12 @@ export default function OrgSetup() {
   };
 
   const orgPwCheck = validatePassword(orgPassword);
+  const adminPwCheck = validatePassword(adminPassword);
 
   const canProceed = () => {
     if (isNameStep) return orgName.trim().length >= 2;
     if (isCredStep) return orgEmail.trim().length > 3 && orgPwCheck.valid;
+    if (isAdminStep) return adminEmail.trim().length > 3 && adminPwCheck.valid;
     if (isRoleStep) return true;
     if (!setupStep) return false;
     const val = answers[setupStep.key];
@@ -72,7 +82,7 @@ export default function OrgSetup() {
     return !!val;
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     playSuccess();
     const config: OrgConfig = {
       org_type: (answers.org_type as string) || 'other',
@@ -94,12 +104,16 @@ export default function OrgSetup() {
     const slug = orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
     const orgId = crypto.randomUUID?.() || `org-${Date.now()}`;
     
+    // Get mainUser from prop or session
+    const mainSession = mainUserProp || mainAuth.getSession();
+
+    // Create the organization
     createOrg({
       id: orgId,
       name: orgName.trim(),
       slug,
-      owner_id: user?.id || '',
-      owner_email: user?.email || '',
+      owner_id: mainSession?.id || '',
+      owner_email: mainSession?.email || '',
       created_at: new Date().toISOString(),
       config,
       org_email: orgEmail.trim(),
@@ -107,13 +121,29 @@ export default function OrgSetup() {
     });
 
     // Link org to main user account
-    const mainSession = mainAuth.getSession();
     if (mainSession) {
       mainAuth.linkOrgToUser(mainSession.id, orgId);
     }
 
-    if (user?.id) {
-      miniAuth.updateUserOrgId(user.id, orgId);
+    // Create admin user in miniAuth for this org (without starting a session)
+    const signupRes = await miniAuth.signUp(adminEmail.trim(), adminPassword, { skipSession: true });
+    if (signupRes.error) {
+      console.warn('[OrgSetup] Admin user creation:', signupRes.error.message);
+      // If user already exists, try to update their org_id
+    }
+
+    if (signupRes.data?.user) {
+      await miniAuth.updateUserOrgId(signupRes.data.user.id, orgId);
+    }
+
+    toast({ 
+      title: 'Organization Created!', 
+      description: `${orgName.trim()} is ready. Login with your admin credentials: ${adminEmail.trim()}` 
+    });
+
+    // Call completion callback
+    if (onComplete) {
+      onComplete();
     }
   };
 
@@ -129,6 +159,11 @@ export default function OrgSetup() {
         <div className="auth-card glass-strong rounded-2xl p-8 space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
+            {onBack && (
+              <button onClick={onBack} className="absolute top-6 left-6 text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
             <img src={kaLogo} alt="Kota Associates" className="w-14 h-14 mx-auto rounded-2xl shadow-lg object-contain" />
             <h1 className="text-xl font-bold gradient-text">Set Up Your Organization</h1>
             <p className="text-xs text-muted-foreground">
@@ -168,7 +203,7 @@ export default function OrgSetup() {
                 <p className="text-sm font-medium text-foreground">Set Organization Credentials</p>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                These credentials will be required to access this organization. Share them only with authorized team members.
+                These credentials protect access to this organization. Share them only with authorized team members.
               </p>
               <div className="space-y-3">
                 <div>
@@ -198,20 +233,49 @@ export default function OrgSetup() {
                     </button>
                   </div>
                   {orgPassword.length > 0 && (
-                    <div className="grid grid-cols-2 gap-1 mt-1.5">
-                      {[
-                        { label: '8+ chars', ok: orgPassword.length >= 8 },
-                        { label: 'Uppercase', ok: /[A-Z]/.test(orgPassword) },
-                        { label: 'Lowercase', ok: /[a-z]/.test(orgPassword) },
-                        { label: 'Number', ok: /[0-9]/.test(orgPassword) },
-                        { label: 'Special', ok: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(orgPassword) },
-                      ].map(r => (
-                        <div key={r.label} className="flex items-center gap-1">
-                          {r.ok ? <Check className="w-3 h-3 text-[hsl(var(--success))]" /> : <X className="w-3 h-3 text-muted-foreground/40" />}
-                          <span className={`text-[10px] ${r.ok ? 'text-[hsl(var(--success))]' : 'text-muted-foreground/60'}`}>{r.label}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <PasswordChecklist password={orgPassword} />
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : isAdminStep ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium text-foreground">Create Admin Account</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                This admin account will be used to login and manage the organization&apos;s ERP system.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Admin Email</label>
+                  <Input
+                    type="email"
+                    value={adminEmail}
+                    onChange={e => setAdminEmail(e.target.value)}
+                    placeholder="admin@company.com"
+                    className="mt-1 h-11 rounded-xl"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Admin Password</label>
+                  <div className="relative">
+                    <Input
+                      type={showAdminPw ? 'text' : 'password'}
+                      value={adminPassword}
+                      onChange={e => setAdminPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="mt-1 h-11 rounded-xl pr-10"
+                    />
+                    <button type="button" onClick={() => setShowAdminPw(!showAdminPw)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showAdminPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {adminPassword.length > 0 && (
+                    <PasswordChecklist password={adminPassword} />
                   )}
                 </div>
               </div>
@@ -291,8 +355,14 @@ export default function OrgSetup() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setStep(Math.max(0, step - 1)); playClick(); }}
-              disabled={step === 0}
+              onClick={() => { 
+                if (step === 0 && onBack) {
+                  onBack();
+                } else {
+                  setStep(Math.max(0, step - 1)); 
+                  playClick(); 
+                }
+              }}
               className="gap-1"
             >
               <ChevronLeft className="w-4 h-4" /> Back
@@ -325,6 +395,26 @@ export default function OrgSetup() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Reusable password checklist component
+function PasswordChecklist({ password }: { password: string }) {
+  return (
+    <div className="grid grid-cols-2 gap-1 mt-1.5">
+      {[
+        { label: '8+ chars', ok: password.length >= 8 },
+        { label: 'Uppercase', ok: /[A-Z]/.test(password) },
+        { label: 'Lowercase', ok: /[a-z]/.test(password) },
+        { label: 'Number', ok: /[0-9]/.test(password) },
+        { label: 'Special', ok: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) },
+      ].map(r => (
+        <div key={r.label} className="flex items-center gap-1">
+          {r.ok ? <Check className="w-3 h-3 text-[hsl(var(--success))]" /> : <X className="w-3 h-3 text-muted-foreground/40" />}
+          <span className={`text-[10px] ${r.ok ? 'text-[hsl(var(--success))]' : 'text-muted-foreground/60'}`}>{r.label}</span>
+        </div>
+      ))}
     </div>
   );
 }
