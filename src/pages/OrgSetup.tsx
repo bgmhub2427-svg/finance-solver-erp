@@ -14,8 +14,12 @@ import kaLogo from '@/assets/kota-associates-logo.png';
 export default function OrgSetup() {
   const { createOrg } = useOrg();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [orgName, setOrgName] = useState('');
+  const [orgEmail, setOrgEmail] = useState('');
+  const [orgPassword, setOrgPassword] = useState('');
+  const [showOrgPw, setShowOrgPw] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [roleLimits, setRoleLimits] = useState<RoleLimits>(defaultRoleLimits('6-20'));
 
