@@ -7,6 +7,7 @@ import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import type { ReactNode } from "react";
 import WelcomeLoader from "@/components/WelcomeLoader";
+import LoginSummary from "@/components/LoginSummary";
 import { ERPProvider } from "@/lib/erp-store";
 import { useDailyReportAutoSave } from "@/hooks/useDailyReportAutoSave";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
@@ -90,6 +91,7 @@ function DailyReportRunner() {
 function ProtectedRoutes() {
   const { user, loading, role } = useAuth();
   const { isOrgSetupDone } = useOrg();
+  const [showLoginSummary, setShowLoginSummary] = useState(true);
 
   if (loading)
     return (
@@ -103,7 +105,6 @@ function ProtectedRoutes() {
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  // If user has no org setup, show the setup wizard
   if (!isOrgSetupDone) {
     return <OrgSetup />;
   }
@@ -133,6 +134,11 @@ function ProtectedRoutes() {
         </div>
       </div>
     );
+
+  // Show login summary with finance stats for 2 seconds
+  if (showLoginSummary) {
+    return <LoginSummary onComplete={() => setShowLoginSummary(false)} />;
+  }
 
   return (
     <ERPProvider>
