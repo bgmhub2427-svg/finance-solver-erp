@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrg } from '@/hooks/useOrg';
 import { useAuth } from '@/hooks/useAuth';
+import { miniAuth } from '@/lib/mini-supabase';
 import { SETUP_STEPS, deriveModules, type OrgConfig } from '@/lib/org-types';
 import { playClick, playSuccess } from '@/lib/sound-engine';
 
