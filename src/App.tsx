@@ -7,6 +7,7 @@ import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import type { ReactNode } from "react";
 import WelcomeLoader from "@/components/WelcomeLoader";
+import LoginSummary from "@/components/LoginSummary";
 import { ERPProvider } from "@/lib/erp-store";
 import { useDailyReportAutoSave } from "@/hooks/useDailyReportAutoSave";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
