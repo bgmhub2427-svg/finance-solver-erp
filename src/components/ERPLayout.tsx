@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, ChevronLeft,
-  ChevronRight, Building2, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
+  ChevronRight, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
   CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Sparkles, Search, Plus
 } from 'lucide-react';
 import { useERP } from '@/lib/erp-store';
@@ -11,6 +11,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { getAvailableFYs, createFinancialYear } from '@/lib/mini-supabase';
 import { playClick } from '@/lib/sound-engine';
 import { useToast } from '@/hooks/use-toast';
+import { startAutoBackup } from '@/lib/auto-backup';
+import kaLogo from '@/assets/kota-associates-logo.png';
 
 const ADMIN_NAV = [
   { to: '/control-panel', icon: LayoutDashboard, label: 'Control Panel' },
