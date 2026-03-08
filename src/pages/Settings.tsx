@@ -65,6 +65,7 @@ export default function Settings() {
     a.download = `erp-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    playSyncSuccess();
     toast({ title: 'Backup exported successfully' });
   };
 
