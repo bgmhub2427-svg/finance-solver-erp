@@ -30,7 +30,7 @@ async function seedAndLogin() {
   // Use the seeded admin
   const admin = db.users.find(u => u.email === 'admin@ka.com');
   expect(admin).toBeDefined();
-  const result = await miniAuth.signIn('admin@ka.com', 'Ka@2026');
+  const result = await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
   expect(result.error).toBeNull();
   return db;
 }
