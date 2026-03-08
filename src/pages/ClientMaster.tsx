@@ -34,6 +34,7 @@ export default function ClientMaster() {
     clientId: '', name: '', phone: '', gstNumber: '', pan: '', status: 'active' as 'active' | 'inactive', handlerCode: handlers[0]?.code || 'K-A-H-001',
     oldFee: 0, oldFeeEndMonth: 'March', oldFeeDue: 0,
     newFee: 0, newFeeStartMonth: 'April', newFeeDue: 0,
+    previousYearPending: 0,
     // Pending tracking fields
     pendingFromYear: FINANCIAL_YEARS[0],
     pendingFromMonth: 'April',
@@ -78,6 +79,7 @@ export default function ClientMaster() {
       setForm({
         clientId: '', name: '', phone: '', gstNumber: '', pan: '', status: 'active' as 'active' | 'inactive', handlerCode: handlers[0]?.code || 'K-A-H-001',
         oldFee: 0, oldFeeEndMonth: 'March', oldFeeDue: 0, newFee: 0, newFeeStartMonth: 'April', newFeeDue: 0,
+        previousYearPending: 0,
         pendingFromYear: FINANCIAL_YEARS[0], pendingFromMonth: 'April',
         pendingToYear: currentFY, pendingToMonth: 'March',
       });
@@ -223,6 +225,10 @@ export default function ClientMaster() {
                 <div>
                   <label className="text-xs text-muted-foreground">New Fee Due (₹)</label>
                   <Input type="number" value={form.newFeeDue} onChange={e => setForm({ ...form, newFeeDue: +e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Previous Year Pending (₹)</label>
+                  <Input type="number" value={form.previousYearPending} onChange={e => setForm({ ...form, previousYearPending: +e.target.value })} placeholder="0" />
                 </div>
 
                 {/* Pending Tracking Fields */}
