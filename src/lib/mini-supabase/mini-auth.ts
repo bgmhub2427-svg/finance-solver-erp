@@ -45,7 +45,7 @@ export const miniAuth = {
     return { data: { user: session.user }, error: null };
   },
 
-  async signUp(email: string, password: string) {
+  async signUp(email: string, password: string, opts?: { skipSession?: boolean }) {
     // Strong password validation
     const { valid, errors } = validatePassword(password);
     if (!valid) {
@@ -57,7 +57,7 @@ export const miniAuth = {
       return { error: new Error('User already exists') };
     }
 
-    const role = isAdminEmail(email) ? 'admin' : 'admin'; // New signups are org admins
+    const role = 'admin'; // New signups are org admins
 
     const user: MiniUser = {
       id: genId(),
@@ -82,8 +82,10 @@ export const miniAuth = {
     });
     await saveDB(db);
 
-    writeJSON(SESSION_KEY, { user: { ...user } });
-    emit('SIGNED_IN');
+    if (!opts?.skipSession) {
+      writeJSON(SESSION_KEY, { user: { ...user } });
+      emit('SIGNED_IN');
+    }
     return { data: { user }, error: null };
   },
 
