@@ -9,6 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
+import { playClick, playSuccess, playError } from '@/lib/sound-engine';
 
 function formatCurrency(n: number) {
   return '₹' + n.toLocaleString('en-IN');
