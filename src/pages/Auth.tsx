@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { miniAuth } from '@/lib/mini-supabase';
 import { mainAuth, type MainUser } from '@/lib/main-auth';
 import { LogIn, UserPlus, Shield, Eye, EyeOff, Check, X, ArrowLeft, Building2, KeyRound, Users } from 'lucide-react';
@@ -26,6 +26,30 @@ export default function Auth() {
   const [orgUserPassword, setOrgUserPassword] = useState('');
   const { toast } = useToast();
   const { orgs } = useOrg();
+
+  // One-time reset: clear all demo/test data so user starts fresh
+  useEffect(() => {
+    const RESET_FLAG = 'erp_fresh_reset_v1';
+    if (!localStorage.getItem(RESET_FLAG)) {
+      // Clear all ERP-related localStorage keys
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('erp_') || key.startsWith('mini_'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+
+      // Clear IndexedDB
+      try {
+        indexedDB.deleteDatabase('erp_finance_solver');
+      } catch {}
+
+      localStorage.setItem(RESET_FLAG, 'done');
+      console.log('[Auth] Cleared all existing data for fresh start');
+    }
+  }, []);
 
   const pwCheck = validatePassword(password);
 
