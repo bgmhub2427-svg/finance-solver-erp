@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 type ModuleName = 'clients' | 'payments' | 'invoices' | 'handlers';
 type ActionName = 'create' | 'update' | 'delete' | 'restore';
 
-const PERMISSION_MATRIX: Record<'admin' | 'manager' | 'handler' | 'viewer', Record<ModuleName, Partial<Record<ActionName, boolean>>>> = {
+const PERMISSION_MATRIX: Record<'admin' | 'manager' | 'handler' | 'viewer' | 'fee_collector', Record<ModuleName, Partial<Record<ActionName, boolean>>>> = {
   admin: {
     clients: { create: true, update: true, delete: true, restore: true },
     payments: { create: true, update: true, delete: true, restore: true },
@@ -23,6 +23,12 @@ const PERMISSION_MATRIX: Record<'admin' | 'manager' | 'handler' | 'viewer', Reco
     clients: { create: true, update: true, delete: true },
     payments: { create: true, update: true, delete: true },
     invoices: { create: true, update: true, delete: false },
+    handlers: {},
+  },
+  fee_collector: {
+    clients: {},
+    payments: { create: true },
+    invoices: {},
     handlers: {},
   },
   viewer: {

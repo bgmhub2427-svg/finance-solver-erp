@@ -2,7 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { miniAuth, miniDB } from '@/lib/mini-supabase';
 import type { MiniUser } from '@/lib/mini-supabase';
 
-export type UserRole = 'admin' | 'manager' | 'handler' | 'viewer';
+export type UserRole = 'admin' | 'manager' | 'handler' | 'viewer' | 'fee_collector';
 type AppRole = UserRole | 'none' | null;
 
 type Session = { user: MiniUser } | null;
