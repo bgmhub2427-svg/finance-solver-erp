@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Building2, ChevronRight, ChevronLeft, Check, Sparkles } from 'lucide-react';
+import { Building2, ChevronRight, ChevronLeft, Check, Sparkles, Users, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrg } from '@/hooks/useOrg';
 import { useAuth } from '@/hooks/useAuth';
 import { miniAuth } from '@/lib/mini-supabase';
-import { SETUP_STEPS, deriveModules, type OrgConfig } from '@/lib/org-types';
+import { SETUP_STEPS, deriveModules, defaultRoleLimits, ROLE_LABELS, type OrgConfig, type RoleLimits } from '@/lib/org-types';
 import { playClick, playSuccess } from '@/lib/sound-engine';
+import kaLogo from '@/assets/kota-associates-logo.png';
 
 export default function OrgSetup() {
   const { createOrg } = useOrg();
@@ -14,10 +15,16 @@ export default function OrgSetup() {
   const [step, setStep] = useState(0);
   const [orgName, setOrgName] = useState('');
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+  const [roleLimits, setRoleLimits] = useState<RoleLimits>(defaultRoleLimits('6-20'));
 
-  const totalSteps = SETUP_STEPS.length + 1; // +1 for org name step
+  // Steps: org name + setup questions + role limits
+  const totalSteps = SETUP_STEPS.length + 2;
   const isNameStep = step === 0;
-  const setupStep = !isNameStep ? SETUP_STEPS[step - 1] : null;
+  const isRoleStep = step === totalSteps - 1;
+  const setupStepIdx = step - 1;
+  const setupStep = !isNameStep && !isRoleStep && setupStepIdx >= 0 && setupStepIdx < SETUP_STEPS.length
+    ? SETUP_STEPS[setupStepIdx]
+    : null;
   const isMulti = (setupStep as any)?.multi === true;
 
   const handleSelect = (value: string) => {
@@ -31,11 +38,24 @@ export default function OrgSetup() {
       setAnswers({ ...answers, [setupStep.key]: updated });
     } else {
       setAnswers({ ...answers, [setupStep.key]: value });
+      // Auto-update role limits when team size changes
+      if (setupStep.key === 'team_size') {
+        setRoleLimits(defaultRoleLimits(value));
+      }
     }
+  };
+
+  const adjustRole = (role: keyof RoleLimits, delta: number) => {
+    playClick();
+    setRoleLimits(prev => ({
+      ...prev,
+      [role]: Math.max(0, Math.min(99, prev[role] + delta)),
+    }));
   };
 
   const canProceed = () => {
     if (isNameStep) return orgName.trim().length >= 2;
+    if (isRoleStep) return true;
     if (!setupStep) return false;
     const val = answers[setupStep.key];
     if (isMulti) return Array.isArray(val) && val.length > 0;
@@ -58,10 +78,10 @@ export default function OrgSetup() {
         services: answers.services as string[],
         payment_structure: answers.payment_structure as string,
       } as Partial<OrgConfig>),
+      role_limits: roleLimits,
     };
 
     const slug = orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
-
     const orgId = crypto.randomUUID?.() || `org-${Date.now()}`;
     
     createOrg({
@@ -74,7 +94,6 @@ export default function OrgSetup() {
       config,
     });
 
-    // Assign org_id to current user
     if (user?.id) {
       miniAuth.updateUserOrgId(user.id, orgId);
     }
@@ -92,9 +111,7 @@ export default function OrgSetup() {
         <div className="auth-card glass-strong rounded-2xl p-8 space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center animate-float shadow-lg">
-              <Building2 className="w-7 h-7 text-primary-foreground" />
-            </div>
+            <img src={kaLogo} alt="Kota Associates" className="w-14 h-14 mx-auto rounded-2xl shadow-lg object-contain" />
             <h1 className="text-xl font-bold gradient-text">Set Up Your Organization</h1>
             <p className="text-xs text-muted-foreground">
               Step {step + 1} of {totalSteps} — We&apos;ll configure your ERP based on your answers
@@ -124,6 +141,41 @@ export default function OrgSetup() {
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   This will be your company&apos;s display name in the ERP system.
                 </p>
+              </div>
+            </div>
+          ) : isRoleStep ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium text-foreground">How many of each role do you need?</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground">You can change these limits anytime in Settings.</p>
+              <div className="grid gap-2.5">
+                {(Object.keys(roleLimits) as (keyof RoleLimits)[]).map(role => (
+                  <div
+                    key={role}
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-border/60 bg-muted/30"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{ROLE_LABELS[role] || role}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => adjustRole(role, -1)}
+                        className="w-7 h-7 rounded-lg border border-border/60 flex items-center justify-center hover:bg-muted transition-colors"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="erp-mono text-base font-bold w-6 text-center">{roleLimits[role]}</span>
+                      <button
+                        onClick={() => adjustRole(role, 1)}
+                        className="w-7 h-7 rounded-lg border border-border/60 flex items-center justify-center hover:bg-muted transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ) : setupStep ? (
@@ -192,6 +244,11 @@ export default function OrgSetup() {
                 <Sparkles className="w-4 h-4" /> Launch ERP
               </Button>
             )}
+          </div>
+
+          {/* Footer branding */}
+          <div className="text-center pt-2 border-t border-border/30">
+            <p className="text-[10px] text-muted-foreground">Finance Solver — F.S.001 • Created by Kota Associates</p>
           </div>
         </div>
       </div>
