@@ -30,7 +30,7 @@ async function seedAndLogin() {
   // Use the seeded admin
   const admin = db.users.find(u => u.email === 'admin@ka.com');
   expect(admin).toBeDefined();
-  const result = await miniAuth.signIn('admin@ka.com', 'Ka@2026');
+  const result = await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
   expect(result.error).toBeNull();
   return db;
 }
@@ -47,10 +47,10 @@ describe('Mini-Supabase Core', () => {
   describe('Authentication', () => {
     it('should sign up a new user', async () => {
       await resetDB();
-      const res = await miniAuth.signUp('testuser@example.com', 'Test@123');
+      const res = await miniAuth.signUp('testuser@example.com', 'Test@123!Ab');
       expect(res.error).toBeNull();
       expect(res.data?.user.email).toBe('testuser@example.com');
-      expect(res.data?.user.role).toBe('viewer'); // non-admin default
+      expect(res.data?.user.role).toBe('admin'); // new signups are org admins
     });
 
     it('should assign admin role to admin emails on signup', async () => {
@@ -62,7 +62,7 @@ describe('Mini-Supabase Core', () => {
 
     it('should sign in with valid credentials', async () => {
       await resetDB();
-      const res = await miniAuth.signIn('admin@ka.com', 'Ka@2026');
+      const res = await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
       expect(res.error).toBeNull();
       expect(res.data?.user.role).toBe('admin');
     });
@@ -428,7 +428,7 @@ describe('Mini-Supabase Core', () => {
   describe('Audit Logging', () => {
     it('should log sign-in events', async () => {
       await resetDB();
-      await miniAuth.signIn('admin@ka.com', 'Ka@2026');
+      await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
       
       const db = await loadDB();
       const loginLogs = db.audit_logs.filter((l: any) => l.action === 'login');
@@ -441,7 +441,7 @@ describe('Mini-Supabase Core', () => {
       await miniAuth.signOut();
 
       // Need to reload as admin to check
-      await miniAuth.signIn('admin@ka.com', 'Ka@2026');
+      await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
       const db = await loadDB();
       const logoutLogs = db.audit_logs.filter((l: any) => l.action === 'logout');
       expect(logoutLogs.length).toBeGreaterThanOrEqual(1);

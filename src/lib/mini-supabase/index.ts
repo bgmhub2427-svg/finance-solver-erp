@@ -7,9 +7,7 @@ export type { UserRole, MiniUser } from './mini-db';
 export { isAdminEmail, switchFY, createFinancialYear, deleteFinancialYear, getActiveFY, getAvailableFYs, setAvailableFYs } from './mini-db';
 
 export async function resetDB() {
-
   const db = await loadDB();
-
   const adminUsers = (db.users || []).filter((u:any) => u.role === "admin");
 
   const newDB = {
@@ -32,7 +30,6 @@ export async function resetDB() {
   };
 
   await saveDB(newDB as any);
-
 }
 
 export { processUploadBatch, verifyPayloadHash } from '../upload-engine';

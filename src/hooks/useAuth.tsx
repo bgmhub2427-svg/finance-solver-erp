@@ -10,6 +10,7 @@ type Session = { user: MiniUser } | null;
 export type AuthUser = MiniUser & {
   role: AppRole;
   handler_id: string | null;
+  org_id?: string | null;
 };
 
 interface AuthCtx {
