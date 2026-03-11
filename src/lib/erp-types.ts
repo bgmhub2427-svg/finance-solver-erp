@@ -30,6 +30,7 @@ export interface Client {
 
 export interface Payment {
   id: string;
+  paymentId?: string;
   financialYear: string;
   date: string;
   clientId: string;

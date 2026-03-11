@@ -141,8 +141,10 @@ export default function PaymentTracking() {
 
     setSaving(true);
     try {
+      const paymentId = generatePaymentId();
       await addPayment({
         ...form,
+        paymentId,
         payment: computedPayment,
         dueAmount: form.dueAmount,
         financialYear: currentFY,
