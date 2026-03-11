@@ -40,7 +40,7 @@ export default function Auth() {
         }
       }
       keysToRemove.forEach(k => localStorage.removeItem(k));
-      try { indexedDB.deleteDatabase('erp_finance_solver'); } catch {}
+      try { indexedDB.deleteDatabase('erp_mini_supabase'); } catch {}
       localStorage.setItem(RESET_FLAG, 'done');
       console.log('[Auth] Cleared all existing data for fresh start v2');
     }

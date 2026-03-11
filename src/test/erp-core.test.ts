@@ -23,15 +23,20 @@ import { loadDB, saveDB, resetDB, genId, isAdminEmail, switchFY, createFinancial
 import { miniAuth } from '@/lib/mini-supabase/mini-auth';
 import { miniDB } from '@/lib/mini-supabase/mini-query';
 
+const TEST_ADMIN_EMAIL = 'testadmin@erp.com';
+const TEST_ADMIN_PASSWORD = 'Admin@2026!x';
+
 // ─── Helpers ────────────────────────────────────────────────────────
 async function seedAndLogin() {
   await resetDB();
+  // Create admin user dynamically
+  const signupRes = await miniAuth.signUp(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD);
+  expect(signupRes.error).toBeNull();
+  // signUp auto-logs in, verify
+  const user = miniAuth.getCurrentUser();
+  expect(user).toBeDefined();
+  expect(user!.role).toBe('admin');
   const db = await loadDB();
-  // Use the seeded admin
-  const admin = db.users.find(u => u.email === 'admin@ka.com');
-  expect(admin).toBeDefined();
-  const result = await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
-  expect(result.error).toBeNull();
   return db;
 }
 
@@ -53,23 +58,27 @@ describe('Mini-Supabase Core', () => {
       expect(res.data?.user.role).toBe('admin'); // new signups are org admins
     });
 
-    it('should assign admin role to admin emails on signup', async () => {
+    it('should reject duplicate signup', async () => {
       await resetDB();
-      const res = await miniAuth.signUp('admin@ka.com', 'Test@123');
-      // User already exists from seed, so this should fail
+      await miniAuth.signUp('dup@test.com', 'Test@123!Ab');
+      const res = await miniAuth.signUp('dup@test.com', 'Test@123!Ab');
       expect(res.error).toBeDefined();
     });
 
     it('should sign in with valid credentials', async () => {
       await resetDB();
-      const res = await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
+      await miniAuth.signUp(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD);
+      await miniAuth.signOut();
+      const res = await miniAuth.signIn(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD);
       expect(res.error).toBeNull();
       expect(res.data?.user.role).toBe('admin');
     });
 
     it('should reject invalid credentials', async () => {
       await resetDB();
-      const res = await miniAuth.signIn('admin@ka.com', 'wrong_password');
+      await miniAuth.signUp(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD);
+      await miniAuth.signOut();
+      const res = await miniAuth.signIn(TEST_ADMIN_EMAIL, 'wrong_password');
       expect(res.error).toBeDefined();
     });
 
@@ -96,6 +105,25 @@ describe('Mini-Supabase Core', () => {
       const handler = db.handlers.find((h: any) => h.code === 'H01');
       expect(handler).toBeDefined();
       expect(handler?.name).toBe('Test Handler');
+    });
+
+    it('should create org users with different roles', async () => {
+      await seedAndLogin();
+
+      const viewerRes = await miniAuth.createOrgUser({
+        email: 'viewer@org.com',
+        password: 'Viewer@123!',
+        role: 'viewer',
+      });
+      expect(viewerRes.error).toBeNull();
+      expect(viewerRes.data?.user.role).toBe('viewer');
+
+      const collectorRes = await miniAuth.createOrgUser({
+        email: 'collector@org.com',
+        password: 'Collect@123!',
+        role: 'fee_collector' as any,
+      });
+      expect(collectorRes.error).toBeNull();
     });
   });
 
@@ -247,9 +275,16 @@ describe('Mini-Supabase Core', () => {
     });
 
     it('viewer cannot insert clients', async () => {
-      await resetDB();
-      // Sign up as viewer
-      await miniAuth.signUp('viewer@test.com', 'View@123');
+      await seedAndLogin();
+      // Create a viewer user
+      await miniAuth.createOrgUser({
+        email: 'viewer@test.com',
+        password: 'View@123!x',
+        role: 'viewer',
+      });
+      // Sign out admin, sign in as viewer
+      await miniAuth.signOut();
+      await miniAuth.signIn('viewer@test.com', 'View@123!x');
       
       const { data, error } = await miniDB.from('clients').insert({
         client_id: 'VTEST',
@@ -257,11 +292,6 @@ describe('Mini-Supabase Core', () => {
         handler_code: 'H01',
       });
 
-      // Viewer can't insert (canAccess returns false for non-admin on clients insert)
-      // But mini-query allows select for viewers — the permission is enforced at erp-store level
-      // At mini-query level, viewers can insert if canAccess allows it
-      // canAccess: role=viewer, table=clients => action=select only
-      // So insert should fail
       expect(error).toBeDefined();
     });
   });
@@ -391,10 +421,9 @@ describe('Mini-Supabase Core', () => {
 
   // ── Admin Email Check ─────────────────────────────────────────────
   describe('Admin Emails', () => {
-    it('should recognize admin emails', () => {
-      expect(isAdminEmail('admin@ka.com')).toBe(true);
-      expect(isAdminEmail('ADMIN@KA.COM')).toBe(true);
-      expect(isAdminEmail('suneelkumarkota@admin.com')).toBe(true);
+    it('should not have hardcoded admin emails (dynamic per-org)', () => {
+      // isAdminEmail now always returns false — admins are assigned during org setup
+      expect(isAdminEmail('admin@ka.com')).toBe(false);
       expect(isAdminEmail('random@test.com')).toBe(false);
     });
   });
@@ -409,7 +438,7 @@ describe('Mini-Supabase Core', () => {
 
   // ── Database Reset ────────────────────────────────────────────────
   describe('Database Reset', () => {
-    it('should reset to default state with admin users', async () => {
+    it('should reset to default empty state', async () => {
       await seedAndLogin();
       
       // Add some data
@@ -419,8 +448,8 @@ describe('Mini-Supabase Core', () => {
       const db = await loadDB();
       
       expect(db.clients).toHaveLength(0);
-      expect(db.users.length).toBeGreaterThanOrEqual(5); // All admin users preserved
-      expect(db.users.every(u => u.role === 'admin')).toBe(true);
+      expect(db.payments).toHaveLength(0);
+      expect(db.invoices).toHaveLength(0);
     });
   });
 
@@ -428,20 +457,24 @@ describe('Mini-Supabase Core', () => {
   describe('Audit Logging', () => {
     it('should log sign-in events', async () => {
       await resetDB();
-      await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
+      // Create user first
+      await miniAuth.signUp(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD);
+      await miniAuth.signOut();
+      // Sign in
+      await miniAuth.signIn(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD);
       
       const db = await loadDB();
       const loginLogs = db.audit_logs.filter((l: any) => l.action === 'login');
       expect(loginLogs.length).toBeGreaterThanOrEqual(1);
-      expect(loginLogs[0].user_email).toBe('admin@ka.com');
+      expect(loginLogs[0].user_email).toBe(TEST_ADMIN_EMAIL);
     });
 
     it('should log sign-out events', async () => {
       await seedAndLogin();
       await miniAuth.signOut();
 
-      // Need to reload as admin to check
-      await miniAuth.signIn('admin@ka.com', 'Ka@2026!x');
+      // Sign back in to check logs
+      await miniAuth.signIn(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD);
       const db = await loadDB();
       const logoutLogs = db.audit_logs.filter((l: any) => l.action === 'logout');
       expect(logoutLogs.length).toBeGreaterThanOrEqual(1);
@@ -451,7 +484,7 @@ describe('Mini-Supabase Core', () => {
       await seedAndLogin();
       await miniAuth.createHandlerUser({
         email: 'audit_handler@test.com',
-        password: 'Test@123',
+        password: 'Test@123!x',
         handler_code: 'AH01',
         handler_name: 'Audit Handler',
       });
@@ -462,7 +495,7 @@ describe('Mini-Supabase Core', () => {
     });
   });
 
-  // ── RPC ───────────────────────────────────────────────────────────
+  // ── RPC Functions ─────────────────────────────────────────────────
   describe('RPC Functions', () => {
     it('get_my_role returns current user role', async () => {
       await seedAndLogin();
@@ -472,17 +505,19 @@ describe('Mini-Supabase Core', () => {
 
     it('get_my_handler_code returns handler code', async () => {
       await seedAndLogin();
-      // Create and login as handler
-      await miniAuth.createHandlerUser({
+      const res = await miniAuth.createHandlerUser({
         email: 'rpc_handler@test.com',
-        password: 'Test@123',
+        password: 'Handler@123',
         handler_code: 'RPC01',
         handler_name: 'RPC Handler',
       });
-      await miniAuth.signIn('rpc_handler@test.com', 'Test@123');
 
-      const { data } = await miniDB.rpc('get_my_handler_code');
-      expect(data).toBe('RPC01');
+      // Sign in as handler
+      await miniAuth.signOut();
+      await miniAuth.signIn('rpc_handler@test.com', 'Handler@123');
+
+      const { data: code } = await miniDB.rpc('get_my_handler_code');
+      expect(code).toBe('RPC01');
     });
   });
 });
