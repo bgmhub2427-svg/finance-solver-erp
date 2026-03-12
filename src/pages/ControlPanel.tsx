@@ -134,46 +134,7 @@ export default function ControlPanel() {
     );
   }
 
-  const stats = getDashboardStats();
-  const { clients, payments, invoices, currentFY: fy } = useERP();
-  const navigate = useNavigate();
   const collectionRate = stats.totalRevenue > 0 ? ((stats.totalCollected / stats.totalRevenue) * 100).toFixed(1) : '0';
-
-  // Top 5 overdue clients for widget
-  const topOverdue = useMemo(() => {
-    const fyClients = clients.filter(c => c.financialYear === fy);
-    const fyPayments = payments.filter(p => p.financialYear === fy);
-    const fyInvoices = invoices.filter(i => i.financialYear === fy);
-
-    const clientPending: { clientId: string; name: string; handler: string; pending: number; days: number }[] = [];
-
-    // From invoices
-    fyInvoices.forEach(inv => {
-      const received = fyPayments.filter(p => p.clientId === inv.clientId).reduce((s, p) => s + p.payment, 0);
-      const pending = Math.max(0, inv.total - Math.min(received, inv.total));
-      if (pending > 0) {
-        const days = Math.floor((Date.now() - new Date(inv.date).getTime()) / 86400000);
-        if (days > 30) {
-          const existing = clientPending.find(c => c.clientId === inv.clientId);
-          if (existing) { existing.pending += pending; existing.days = Math.max(existing.days, days); }
-          else clientPending.push({ clientId: inv.clientId, name: inv.clientName, handler: inv.handlerCode, pending, days });
-        }
-      }
-    });
-
-    // From clients without invoices
-    fyClients.forEach(c => {
-      if (!fyInvoices.some(i => i.clientId === c.clientId) && c.totalPending > 0) {
-        const days = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 86400000);
-        if (days > 30) {
-          const existing = clientPending.find(x => x.clientId === c.clientId);
-          if (!existing) clientPending.push({ clientId: c.clientId, name: c.name, handler: c.handlerCode, pending: c.totalPending, days });
-        }
-      }
-    });
-
-    return clientPending.sort((a, b) => b.pending - a.pending).slice(0, 5);
-  }, [clients, payments, invoices, fy]);
 
   const kpis = [
     { label: 'Total Clients', value: stats.totalClients, icon: Users, color: 'text-info', bg: 'bg-info/10', trend: null },
