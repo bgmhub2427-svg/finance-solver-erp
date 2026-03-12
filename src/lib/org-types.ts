@@ -62,6 +62,7 @@ export const OPTIONAL_MODULES: ModuleDef[] = [
   { id: 'master-database', label: 'Master Database', icon: 'Database', path: '/master-database', adminOrViewer: true },
   { id: 'payments', label: 'Payment Tracking', icon: 'IndianRupee', path: '/payments' },
   { id: 'payment-pending', label: 'Pending Checklist', icon: 'ClipboardCheck', path: '/payment-pending' },
+  { id: 'pending-dashboard', label: 'Pending Dashboard', icon: 'IndianRupee', path: '/pending-dashboard' },
   { id: 'invoices', label: 'Invoice Manager', icon: 'FileText', path: '/invoices', nonViewer: true },
   { id: 'invoice-database', label: 'Invoice Database', icon: 'FileSpreadsheet', path: '/invoice-database', adminOrViewer: true },
 ];

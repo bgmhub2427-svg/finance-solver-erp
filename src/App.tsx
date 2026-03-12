@@ -154,6 +154,7 @@ function ProtectedRoutes() {
           <Route path="/master-database" element={<ModuleRoute moduleId="master-database" adminOrViewer><MasterDatabase /></ModuleRoute>} />
           <Route path="/payments" element={<ModuleRoute moduleId="payments"><PaymentTracking /></ModuleRoute>} />
           <Route path="/payment-pending" element={<ModuleRoute moduleId="payment-pending"><PendingChecklist /></ModuleRoute>} />
+          <Route path="/pending-dashboard" element={<ModuleRoute moduleId="pending-dashboard"><PendingDashboard /></ModuleRoute>} />
           <Route path="/invoices" element={<ModuleRoute moduleId="invoices" nonViewer><InvoiceManager /></ModuleRoute>} />
           <Route path="/invoice-database" element={<ModuleRoute moduleId="invoice-database" adminOrViewer><InvoiceDatabase /></ModuleRoute>} />
           <Route path="/reports" element={<ModuleRoute moduleId="reports" adminOrViewer><Reports /></ModuleRoute>} />
