@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, ChevronLeft,
   ChevronRight, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
-  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Search, Plus, ChevronsUpDown, Building2
+  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Search, Plus, ChevronsUpDown, Building2, Wallet
 } from 'lucide-react';
 import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,7 +20,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, TrendingUp,
   FileSpreadsheet, CheckSquare, Lock, ScrollText, Calendar,
-  ShieldAlert, Brain, Download,
+  ShieldAlert, Brain, Download, Wallet,
 };
 
 export default function ERPLayout() {
