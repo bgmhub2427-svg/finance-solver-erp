@@ -3,9 +3,12 @@ import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
 import {
   IndianRupee, AlertTriangle, Users, TrendingUp,
-  Search, Filter, Eye, Plus, FileText, ChevronDown, ChevronUp, X
+  Search, Filter, Eye, Plus, FileText, ChevronDown, ChevronUp, X, Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx';
 
 function formatCurrency(n: number) {
   return '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
