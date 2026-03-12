@@ -228,6 +228,45 @@ export default function ControlPanel() {
         </div>
       </div>
 
+      {/* Top 5 Overdue — Pending Dashboard Widget */}
+      {topOverdue.length > 0 && (
+        <div className="erp-kpi-card p-0 overflow-hidden animate-card-enter" style={{ animationDelay: '375ms' }}>
+          <div className="px-5 py-3.5 border-b bg-destructive/5 flex items-center justify-between">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-destructive" /> Top 5 Overdue Clients
+            </h2>
+            <button onClick={() => navigate('/pending-dashboard')} className="text-[10px] text-primary hover:underline font-medium">
+              View All →
+            </button>
+          </div>
+          <table className="erp-table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Handler</th>
+                <th className="text-right">Overdue Amount</th>
+                <th className="text-right">Days</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topOverdue.map(c => (
+                <tr key={c.clientId}>
+                  <td>
+                    <div className="text-xs font-medium">{c.name}</div>
+                    <div className="text-[10px] text-muted-foreground erp-mono">{c.clientId}</div>
+                  </td>
+                  <td className="erp-mono text-xs">{c.handler}</td>
+                  <td className="erp-mono text-xs text-right font-bold text-destructive">{formatCurrency(c.pending)}</td>
+                  <td className="erp-mono text-xs text-right">
+                    <span className={c.days > 90 ? 'text-destructive font-bold' : c.days > 60 ? 'text-warning' : ''}>{c.days}d</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Handler Performance */}
       <div className="erp-kpi-card p-0 overflow-hidden animate-card-enter" style={{ animationDelay: '400ms' }}>
         <div className="px-5 py-3.5 border-b bg-muted/30">

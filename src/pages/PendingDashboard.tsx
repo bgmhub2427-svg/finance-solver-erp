@@ -240,6 +240,9 @@ export default function PendingDashboard() {
           Central receivables control — FY {currentFY}
         </p>
       </div>
+      <Button onClick={exportToExcel} variant="outline" size="sm" className="gap-1.5">
+        <Download className="w-3.5 h-3.5" /> Export Excel
+      </Button>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
