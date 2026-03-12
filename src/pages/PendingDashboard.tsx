@@ -194,6 +194,37 @@ export default function PendingDashboard() {
       : null
   );
 
+  const exportToExcel = () => {
+    const headers = ['#', 'Client ID', 'Client Name', 'Handler', 'Invoice #', 'Invoice Date', 'Invoice Amount', 'Amount Received', 'Pending Amount', 'Days Pending', 'Status'];
+    const rows = filteredRows.map((r, i) => [
+      i + 1, r.clientId, r.clientName, r.handlerCode, r.invoiceNo, r.invoiceDate,
+      r.invoiceTotal, r.amountReceived, r.pendingAmount, r.daysPending, statusLabel(r.status),
+    ]);
+
+    const summarySheet = [
+      ['Pending Dashboard Report — FY ' + currentFY],
+      ['Generated', new Date().toISOString().slice(0, 19).replace('T', ' ')],
+      [],
+      ['Total Receivables', totalReceivables],
+      ['Total Overdue', totalOverdue],
+      ['Pending Clients', pendingClientsCount],
+      ['Received This Month', receivedThisMonth],
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const wsData = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    wsData['!cols'] = headers.map(() => ({ wch: 16 }));
+    XLSX.utils.book_append_sheet(wb, wsData, 'Pending Details');
+
+    const wsSummary = XLSX.utils.aoa_to_sheet(summarySheet);
+    wsSummary['!cols'] = [{ wch: 22 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+    const fileName = `Pending-Dashboard-${currentFY}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    toast({ title: 'Excel exported', description: `${fileName} downloaded with ${filteredRows.length} entries` });
+  };
+
   // Get payment history for expanded row
   const getClientPayments = (clientId: string) => fyPayments.filter(p => p.clientId === clientId);
   const getClientInvoice = (invoiceId: string) => fyInvoices.find(i => i.id === invoiceId);
