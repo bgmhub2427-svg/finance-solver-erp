@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
 import { Eye, Users, IndianRupee, AlertTriangle, TrendingUp, FileText, ClipboardList, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 function formatCurrency(n: number) {
   return '₹' + n.toLocaleString('en-IN');
