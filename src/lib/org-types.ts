@@ -78,7 +78,7 @@ export function deriveModules(config: Partial<OrgConfig>): string[] {
   const billing = config.billing_model || 'monthly';
 
   if (services.some(s => ['collections', 'accounting', 'tax_filing'].includes(s))) {
-    modules.push('collection-dashboard', 'payments', 'payment-pending');
+    modules.push('collection-dashboard', 'payments', 'payment-pending', 'pending-dashboard');
   }
   if (services.some(s => ['consulting', 'tax_filing', 'audit', 'accounting'].includes(s))) {
     modules.push('client-master', 'master-database');
