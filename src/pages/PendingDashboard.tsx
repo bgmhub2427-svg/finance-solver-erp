@@ -68,6 +68,7 @@ export default function PendingDashboard() {
   const { clients, payments, invoices, handlers, currentFY } = useERP();
   const { isAdmin, isViewer } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const [search, setSearch] = useState('');
   const [handlerFilter, setHandlerFilter] = useState('ALL');
