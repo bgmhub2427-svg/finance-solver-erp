@@ -21,6 +21,7 @@ import ClientMaster from "./pages/ClientMaster";
 import MasterDatabase from "./pages/MasterDatabase";
 import PaymentTracking from "./pages/PaymentTracking";
 import PendingChecklist from "./pages/PendingChecklist";
+import PendingDashboard from "./pages/PendingDashboard";
 import InvoiceManager from "./pages/InvoiceManager";
 import InvoiceDatabase from "./pages/InvoiceDatabase";
 import Reports from "./pages/Reports";
