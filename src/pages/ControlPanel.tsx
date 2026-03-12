@@ -9,8 +9,45 @@ function formatCurrency(n: number) {
 }
 
 export default function ControlPanel() {
-  const { getDashboardStats, getHandlerDashboardStats, currentFY } = useERP();
+  const { getDashboardStats, getHandlerDashboardStats, currentFY, clients, payments, invoices } = useERP();
   const { isAdmin, isViewer, handlerCode } = useAuth();
+  const navigate = useNavigate();
+
+  const stats = getDashboardStats();
+
+  // Top 5 overdue (hoisted before early returns to satisfy hooks rules)
+  const topOverdue = useMemo(() => {
+    const fyClients = clients.filter(c => c.financialYear === currentFY);
+    const fyPayments = payments.filter(p => p.financialYear === currentFY);
+    const fyInvoices = invoices.filter(i => i.financialYear === currentFY);
+
+    const clientPending: { clientId: string; name: string; handler: string; pending: number; days: number }[] = [];
+
+    fyInvoices.forEach(inv => {
+      const received = fyPayments.filter(p => p.clientId === inv.clientId).reduce((s, p) => s + p.payment, 0);
+      const pending = Math.max(0, inv.total - Math.min(received, inv.total));
+      if (pending > 0) {
+        const days = Math.floor((Date.now() - new Date(inv.date).getTime()) / 86400000);
+        if (days > 30) {
+          const existing = clientPending.find(c => c.clientId === inv.clientId);
+          if (existing) { existing.pending += pending; existing.days = Math.max(existing.days, days); }
+          else clientPending.push({ clientId: inv.clientId, name: inv.clientName, handler: inv.handlerCode, pending, days });
+        }
+      }
+    });
+
+    fyClients.forEach(c => {
+      if (!fyInvoices.some(i => i.clientId === c.clientId) && c.totalPending > 0) {
+        const days = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 86400000);
+        if (days > 30) {
+          const existing = clientPending.find(x => x.clientId === c.clientId);
+          if (!existing) clientPending.push({ clientId: c.clientId, name: c.name, handler: c.handlerCode, pending: c.totalPending, days });
+        }
+      }
+    });
+
+    return clientPending.sort((a, b) => b.pending - a.pending).slice(0, 5);
+  }, [clients, payments, invoices, currentFY]);
 
   if (isViewer) {
     const stats = getDashboardStats();
