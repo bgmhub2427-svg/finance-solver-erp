@@ -1,15 +1,53 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
 import { Eye, Users, IndianRupee, AlertTriangle, TrendingUp, FileText, ClipboardList, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 function formatCurrency(n: number) {
   return '₹' + n.toLocaleString('en-IN');
 }
 
 export default function ControlPanel() {
-  const { getDashboardStats, getHandlerDashboardStats, currentFY } = useERP();
+  const { getDashboardStats, getHandlerDashboardStats, currentFY, clients, payments, invoices } = useERP();
   const { isAdmin, isViewer, handlerCode } = useAuth();
+  const navigate = useNavigate();
+
+  const stats = getDashboardStats();
+
+  // Top 5 overdue (hoisted before early returns to satisfy hooks rules)
+  const topOverdue = useMemo(() => {
+    const fyClients = clients.filter(c => c.financialYear === currentFY);
+    const fyPayments = payments.filter(p => p.financialYear === currentFY);
+    const fyInvoices = invoices.filter(i => i.financialYear === currentFY);
+
+    const clientPending: { clientId: string; name: string; handler: string; pending: number; days: number }[] = [];
+
+    fyInvoices.forEach(inv => {
+      const received = fyPayments.filter(p => p.clientId === inv.clientId).reduce((s, p) => s + p.payment, 0);
+      const pending = Math.max(0, inv.total - Math.min(received, inv.total));
+      if (pending > 0) {
+        const days = Math.floor((Date.now() - new Date(inv.date).getTime()) / 86400000);
+        if (days > 30) {
+          const existing = clientPending.find(c => c.clientId === inv.clientId);
+          if (existing) { existing.pending += pending; existing.days = Math.max(existing.days, days); }
+          else clientPending.push({ clientId: inv.clientId, name: inv.clientName, handler: inv.handlerCode, pending, days });
+        }
+      }
+    });
+
+    fyClients.forEach(c => {
+      if (!fyInvoices.some(i => i.clientId === c.clientId) && c.totalPending > 0) {
+        const days = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 86400000);
+        if (days > 30) {
+          const existing = clientPending.find(x => x.clientId === c.clientId);
+          if (!existing) clientPending.push({ clientId: c.clientId, name: c.name, handler: c.handlerCode, pending: c.totalPending, days });
+        }
+      }
+    });
+
+    return clientPending.sort((a, b) => b.pending - a.pending).slice(0, 5);
+  }, [clients, payments, invoices, currentFY]);
 
   if (isViewer) {
     const stats = getDashboardStats();
@@ -96,7 +134,6 @@ export default function ControlPanel() {
     );
   }
 
-  const stats = getDashboardStats();
   const collectionRate = stats.totalRevenue > 0 ? ((stats.totalCollected / stats.totalRevenue) * 100).toFixed(1) : '0';
 
   const kpis = [
@@ -188,6 +225,45 @@ export default function ControlPanel() {
           ))}
         </div>
       </div>
+
+      {/* Top 5 Overdue — Pending Dashboard Widget */}
+      {topOverdue.length > 0 && (
+        <div className="erp-kpi-card p-0 overflow-hidden animate-card-enter" style={{ animationDelay: '375ms' }}>
+          <div className="px-5 py-3.5 border-b bg-destructive/5 flex items-center justify-between">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-destructive" /> Top 5 Overdue Clients
+            </h2>
+            <button onClick={() => navigate('/pending-dashboard')} className="text-[10px] text-primary hover:underline font-medium">
+              View All →
+            </button>
+          </div>
+          <table className="erp-table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Handler</th>
+                <th className="text-right">Overdue Amount</th>
+                <th className="text-right">Days</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topOverdue.map(c => (
+                <tr key={c.clientId}>
+                  <td>
+                    <div className="text-xs font-medium">{c.name}</div>
+                    <div className="text-[10px] text-muted-foreground erp-mono">{c.clientId}</div>
+                  </td>
+                  <td className="erp-mono text-xs">{c.handler}</td>
+                  <td className="erp-mono text-xs text-right font-bold text-destructive">{formatCurrency(c.pending)}</td>
+                  <td className="erp-mono text-xs text-right">
+                    <span className={c.days > 90 ? 'text-destructive font-bold' : c.days > 60 ? 'text-warning' : ''}>{c.days}d</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Handler Performance */}
       <div className="erp-kpi-card p-0 overflow-hidden animate-card-enter" style={{ animationDelay: '400ms' }}>
