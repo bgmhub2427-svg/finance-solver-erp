@@ -33,6 +33,7 @@ export interface ERPDatabase {
   client_lifecycle: Record<string, any>[];
   month_locks: Record<string, any>[];
   fraud_alerts: Record<string, any>[];
+  salaries: Record<string, any>[];
 }
 
 // Admin emails are now dynamic per-organization — no hardcoded list
