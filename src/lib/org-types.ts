@@ -65,6 +65,9 @@ export const OPTIONAL_MODULES: ModuleDef[] = [
   { id: 'pending-dashboard', label: 'Pending Dashboard', icon: 'IndianRupee', path: '/pending-dashboard' },
   { id: 'invoices', label: 'Invoice Manager', icon: 'FileText', path: '/invoices', nonViewer: true },
   { id: 'invoice-database', label: 'Invoice Database', icon: 'FileSpreadsheet', path: '/invoice-database', adminOrViewer: true },
+  { id: 'expense-manager', label: 'Expenses', icon: 'Wallet', path: '/expenses', adminOnly: true },
+  { id: 'firm-command-center', label: 'Command Center', icon: 'BarChart3', path: '/command-center', adminOnly: true },
+  { id: 'client-intelligence', label: 'Client Intelligence', icon: 'Eye', path: '/client-intelligence', adminOnly: true },
 ];
 
 export const ALL_MODULES = [...OPTIONAL_MODULES, ...CORE_MODULES];
