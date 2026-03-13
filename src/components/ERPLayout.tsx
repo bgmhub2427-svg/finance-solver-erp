@@ -20,7 +20,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, TrendingUp,
   FileSpreadsheet, CheckSquare, Lock, ScrollText, Calendar,
-  ShieldAlert, Brain, Download, Wallet,
+  ShieldAlert, Brain, Download, Wallet, BarChart3, Eye,
 };
 
 export default function ERPLayout() {

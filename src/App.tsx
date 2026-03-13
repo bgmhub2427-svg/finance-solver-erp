@@ -169,6 +169,9 @@ function ProtectedRoutes() {
           <Route path="/risk-detection" element={<ModuleRoute moduleId="risk-detection" adminOnly><RiskDetection /></ModuleRoute>} />
           <Route path="/ai-planner" element={<ModuleRoute moduleId="ai-planner"><AIPlanner /></ModuleRoute>} />
           <Route path="/excel-master-sync" element={<ModuleRoute moduleId="excel-master-sync" adminOnly><ExcelMasterSync /></ModuleRoute>} />
+          <Route path="/expenses" element={<ModuleRoute moduleId="expense-manager" adminOnly><ExpenseManager /></ModuleRoute>} />
+          <Route path="/command-center" element={<ModuleRoute moduleId="firm-command-center" adminOnly><FirmCommandCenter /></ModuleRoute>} />
+          <Route path="/client-intelligence" element={<ModuleRoute moduleId="client-intelligence" adminOnly><ClientIntelligence /></ModuleRoute>} />
           <Route path="/settings" element={<ModuleRoute moduleId="settings" adminOnly><Settings /></ModuleRoute>} />
         </Route>
         <Route path="*" element={<NotFound />} />

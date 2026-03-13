@@ -83,6 +83,7 @@ function defaultFYData(): FYData {
     client_lifecycle: [],
     month_locks: [],
     fraud_alerts: [],
+    salaries: [],
   };
 }
 
