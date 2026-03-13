@@ -35,6 +35,9 @@ import RiskDetection from "./pages/RiskDetection";
 import AIPlanner from "./pages/AIPlanner";
 import ExcelMasterSync from "./pages/ExcelMasterSync";
 import AdvancedReports from "./pages/AdvancedReports";
+import ExpenseManager from "./pages/ExpenseManager";
+import FirmCommandCenter from "./pages/FirmCommandCenter";
+import ClientIntelligence from "./pages/ClientIntelligence";
 import NotFound from "./pages/NotFound";
 import { miniAuth } from "@/lib/mini-supabase";
 
