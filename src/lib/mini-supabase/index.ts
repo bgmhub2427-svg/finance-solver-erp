@@ -27,6 +27,7 @@ export async function resetDB() {
     client_lifecycle: [],
     month_locks: [],
     fraud_alerts: [],
+    salaries: [],
   };
 
   await saveDB(newDB as any);

@@ -65,6 +65,9 @@ export const OPTIONAL_MODULES: ModuleDef[] = [
   { id: 'pending-dashboard', label: 'Pending Dashboard', icon: 'IndianRupee', path: '/pending-dashboard' },
   { id: 'invoices', label: 'Invoice Manager', icon: 'FileText', path: '/invoices', nonViewer: true },
   { id: 'invoice-database', label: 'Invoice Database', icon: 'FileSpreadsheet', path: '/invoice-database', adminOrViewer: true },
+  { id: 'expense-manager', label: 'Expenses', icon: 'Wallet', path: '/expenses', adminOnly: true },
+  { id: 'firm-command-center', label: 'Command Center', icon: 'BarChart3', path: '/command-center', adminOnly: true },
+  { id: 'client-intelligence', label: 'Client Intelligence', icon: 'Eye', path: '/client-intelligence', adminOnly: true },
 ];
 
 export const ALL_MODULES = [...OPTIONAL_MODULES, ...CORE_MODULES];
@@ -78,7 +81,7 @@ export function deriveModules(config: Partial<OrgConfig>): string[] {
   const billing = config.billing_model || 'monthly';
 
   if (services.some(s => ['collections', 'accounting', 'tax_filing'].includes(s))) {
-    modules.push('collection-dashboard', 'payments', 'payment-pending', 'pending-dashboard');
+    modules.push('collection-dashboard', 'payments', 'payment-pending', 'pending-dashboard', 'expense-manager', 'firm-command-center', 'client-intelligence');
   }
   if (services.some(s => ['consulting', 'tax_filing', 'audit', 'accounting'].includes(s))) {
     modules.push('client-master', 'master-database');

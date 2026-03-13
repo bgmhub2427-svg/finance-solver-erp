@@ -33,6 +33,7 @@ export interface ERPDatabase {
   client_lifecycle: Record<string, any>[];
   month_locks: Record<string, any>[];
   fraud_alerts: Record<string, any>[];
+  salaries: Record<string, any>[];
 }
 
 // Admin emails are now dynamic per-organization — no hardcoded list
@@ -56,7 +57,7 @@ const FY_FIELDS: (keyof ERPDatabase)[] = [
   'clients', 'payments', 'invoices', 'invoice_items',
   'income', 'expenses', 'fee_types', 'client_fees',
   'upload_batches', 'raw_json_logs', 'client_lifecycle',
-  'month_locks', 'fraud_alerts',
+  'month_locks', 'fraud_alerts', 'salaries',
 ];
 
 function defaultGlobal(): GlobalData {
@@ -82,6 +83,7 @@ function defaultFYData(): FYData {
     client_lifecycle: [],
     month_locks: [],
     fraud_alerts: [],
+    salaries: [],
   };
 }
 
