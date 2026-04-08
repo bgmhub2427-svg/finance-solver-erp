@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { miniAuth } from '@/lib/mini-supabase';
-import { mainAuth, type MainUser } from '@/lib/main-auth';
-import { LogIn, UserPlus, Shield, Eye, EyeOff, Check, X, ArrowLeft, Building2, KeyRound, Users } from 'lucide-react';
+import { LogIn, UserPlus, Shield, Eye, EyeOff, Check, X, ArrowLeft, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { playClick, playSuccess, playError } from '@/lib/sound-engine';
-import { validatePassword, type Organization } from '@/lib/org-types';
+import { validatePassword, deriveModules, defaultRoleLimits, SETUP_STEPS, ROLE_LABELS, type OrgConfig, type RoleLimits } from '@/lib/org-types';
 import { useOrg } from '@/hooks/useOrg';
-import OrgSetup from './OrgSetup';
 import kaLogo from '@/assets/kota-associates-logo.png';
 
-type AuthStep = 'choose' | 'main-login' | 'main-signup' | 'org-select' | 'org-setup' | 'org-auth' | 'org-user-login';
+type AuthStep = 'choose' | 'login' | 'signup-creds' | 'signup-setup';
+
+interface SignupData {
+  firmName: string;
+  email: string;
+  password: string;
+}
 
 export default function Auth() {
   const [step, setStep] = useState<AuthStep>('choose');
@@ -19,18 +23,17 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [mainUser, setMainUser] = useState<MainUser | null>(null);
-  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
-  const [orgEmail, setOrgEmail] = useState('');
-  const [orgPassword, setOrgPassword] = useState('');
-  const [orgUserEmail, setOrgUserEmail] = useState('');
-  const [orgUserPassword, setOrgUserPassword] = useState('');
+  const [signupData, setSignupData] = useState<SignupData | null>(null);
+  const [firmName, setFirmName] = useState('');
+  // Setup wizard state
+  const [setupStep, setSetupStep] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const { toast } = useToast();
-  const { orgs } = useOrg();
+  const { createOrg } = useOrg();
 
   // One-time reset: clear all demo/test data so user starts fresh
   useEffect(() => {
-    const RESET_FLAG = 'erp_fresh_reset_v3';
+    const RESET_FLAG = 'erp_fresh_reset_v4';
     if (!localStorage.getItem(RESET_FLAG)) {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -42,139 +45,146 @@ export default function Auth() {
       keysToRemove.forEach(k => localStorage.removeItem(k));
       try { indexedDB.deleteDatabase('erp_mini_supabase'); } catch {}
       localStorage.setItem(RESET_FLAG, 'done');
-      console.log('[Auth] Cleared all existing data for fresh start v2');
     }
   }, []);
 
   const pwCheck = validatePassword(password);
 
   const resetFields = () => {
-    setEmail(''); setPassword(''); setShowPw(false);
-    setOrgEmail(''); setOrgPassword('');
-    setOrgUserEmail(''); setOrgUserPassword('');
+    setEmail(''); setPassword(''); setShowPw(false); setFirmName('');
   };
 
   const goBack = () => {
     playClick();
-    if (step === 'main-login' || step === 'main-signup') { setStep('choose'); resetFields(); }
-    else if (step === 'org-select') { mainAuth.signOut(); setMainUser(null); setStep('choose'); resetFields(); }
-    else if (step === 'org-setup') { setStep('org-select'); }
-    else if (step === 'org-auth') { setSelectedOrg(null); setOrgEmail(''); setOrgPassword(''); setStep('org-select'); }
-    else if (step === 'org-user-login') { setOrgUserEmail(''); setOrgUserPassword(''); setStep('org-auth'); }
-  };
-
-  // Step 2: Main account login
-  const handleMainLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { data, error } = await mainAuth.signIn(email.trim(), password);
-    setLoading(false);
-    if (error) { playError(); toast({ title: 'Login Failed', description: error, variant: 'destructive' }); return; }
-    playSuccess();
-    setMainUser(data);
-    resetFields();
-    setStep('org-select');
-  };
-
-  // Step 2: Main account signup — NO miniAuth session, just main account
-  const handleMainSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pwCheck.valid) { playError(); toast({ title: 'Weak Password', description: pwCheck.errors.join(', '), variant: 'destructive' }); return; }
-    setLoading(true);
-    const { data, error } = mainAuth.signUp(email.trim(), password);
-    setLoading(false);
-    if (error) {
-      playError();
-      toast({ title: 'Signup Failed', description: error, variant: 'destructive' });
-      return;
-    }
-    playSuccess();
-    setMainUser(data);
-    resetFields();
-    toast({ title: 'Account Created', description: 'Now create your first organization.' });
-    setStep('org-select');
-  };
-
-  // Step 3: Org selection
-  const handleOrgSelect = (org: Organization) => {
-    playClick();
-    setSelectedOrg(org);
-    setStep('org-auth');
-  };
-
-  // Step 4: Org credentials
-  const handleOrgAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedOrg) return;
-    if (
-      orgEmail.trim().toLowerCase() === selectedOrg.org_email?.toLowerCase() &&
-      orgPassword === selectedOrg.org_password
-    ) {
-      playSuccess();
-      setOrgEmail(''); setOrgPassword('');
-      setStep('org-user-login');
-    } else {
-      playError();
-      toast({ title: 'Invalid Credentials', description: 'Organization email or password is incorrect.', variant: 'destructive' });
+    if (step === 'login' || step === 'signup-creds') { setStep('choose'); resetFields(); }
+    else if (step === 'signup-setup') {
+      if (setupStep > 0) setSetupStep(setupStep - 1);
+      else setStep('signup-creds');
     }
   };
 
-  // Step 5: Org user login — this is the ONLY place miniAuth session is created
-  const handleOrgUserLogin = async (e: React.FormEvent) => {
+  // Direct login → miniAuth
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await miniAuth.signIn(orgUserEmail.trim(), orgUserPassword);
+      const { error } = await miniAuth.signIn(email.trim(), password);
       if (error) throw error;
       playSuccess();
-      toast({ title: 'Welcome', description: `Signed into ${selectedOrg?.name || 'organization'}.` });
-      // miniAuth session is now set → AuthProvider will detect and redirect to ERP
+      toast({ title: 'Welcome back!', description: 'Signed into Finance Solver ERP.' });
     } catch (err: any) {
       playError();
-      toast({ title: 'Login Failed', description: err.message || 'Invalid credentials', variant: 'destructive' });
+      toast({ title: 'Login Failed', description: err.message || 'Invalid email or password', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
-  // Callback when OrgSetup completes
-  const handleOrgSetupComplete = () => {
-    playSuccess();
-    toast({ title: 'Organization Created', description: 'Now select your organization and login.' });
-    setStep('org-select');
-  };
-
-  // Get orgs linked to main user
-  const linkedOrgs = mainUser
-    ? orgs.filter(o => mainUser.linked_org_ids.includes(o.id))
-    : [];
-
-  // Refresh mainUser's linked_org_ids when orgs change
-  useEffect(() => {
-    if (mainUser) {
-      const refreshed = mainAuth.getSession();
-      if (refreshed && refreshed.linked_org_ids.length !== mainUser.linked_org_ids.length) {
-        setMainUser(refreshed);
-      }
+  // Signup Step 1: Validate creds and move to setup
+  const handleSignupCreds = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pwCheck.valid) {
+      playError();
+      toast({ title: 'Weak Password', description: pwCheck.errors.join(', '), variant: 'destructive' });
+      return;
     }
-  }, [orgs, mainUser]);
-
-  const stepTitle: Record<AuthStep, string> = {
-    'choose': '',
-    'main-login': 'Sign In to Your Account',
-    'main-signup': 'Create Your Account',
-    'org-select': 'Select Organization',
-    'org-setup': 'Create Organization',
-    'org-auth': `Authenticate: ${selectedOrg?.name || ''}`,
-    'org-user-login': `Login to ${selectedOrg?.name || ''}`,
+    if (firmName.trim().length < 2) {
+      playError();
+      toast({ title: 'Invalid Firm Name', description: 'Firm name must be at least 2 characters.', variant: 'destructive' });
+      return;
+    }
+    playClick();
+    setSignupData({ firmName: firmName.trim(), email: email.trim(), password });
+    setStep('signup-setup');
+    setSetupStep(0);
   };
 
-  const stepNumber = step === 'choose' ? 0 : step === 'main-login' || step === 'main-signup' ? 1 : step === 'org-select' || step === 'org-setup' ? 2 : step === 'org-auth' ? 3 : 4;
+  // Setup wizard answer handling
+  const currentSetupStep = SETUP_STEPS[setupStep];
+  const isMulti = (currentSetupStep as any)?.multi === true;
 
-  // Render OrgSetup as full page when on that step
-  if (step === 'org-setup') {
-    return <OrgSetup mainUser={mainUser} onComplete={handleOrgSetupComplete} onBack={() => { setStep('org-select'); playClick(); }} />;
-  }
+  const handleSelect = (value: string) => {
+    if (!currentSetupStep) return;
+    playClick();
+    if (isMulti) {
+      const current = (answers[currentSetupStep.key] as string[]) || [];
+      const updated = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value];
+      setAnswers({ ...answers, [currentSetupStep.key]: updated });
+    } else {
+      setAnswers({ ...answers, [currentSetupStep.key]: value });
+    }
+  };
+
+  const canProceedSetup = () => {
+    if (!currentSetupStep) return false;
+    const val = answers[currentSetupStep.key];
+    if (isMulti) return Array.isArray(val) && val.length > 0;
+    return !!val;
+  };
+
+  // Final: create org + admin user + sign in
+  const handleFinishSetup = async () => {
+    if (!signupData) return;
+    setLoading(true);
+    try {
+      const config: OrgConfig = {
+        org_type: (answers.org_type as string) || 'other',
+        team_size: (answers.team_size as string) || '1-5',
+        billing_model: (answers.billing_model as string) || 'monthly',
+        services: (answers.services as string[]) || [],
+        roles: ['admin', 'manager', 'handler', 'viewer', 'fee_collector'],
+        payment_structure: (answers.payment_structure as string) || 'variable',
+        enabled_modules: deriveModules({
+          org_type: answers.org_type as string,
+          team_size: answers.team_size as string,
+          billing_model: answers.billing_model as string,
+          services: answers.services as string[],
+          payment_structure: answers.payment_structure as string,
+        } as Partial<OrgConfig>),
+        role_limits: defaultRoleLimits((answers.team_size as string) || '1-5'),
+      };
+
+      const slug = signupData.firmName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
+      const orgId = crypto.randomUUID?.() || `org-${Date.now()}`;
+
+      // Create organization
+      createOrg({
+        id: orgId,
+        name: signupData.firmName,
+        slug,
+        owner_id: orgId,
+        owner_email: signupData.email,
+        created_at: new Date().toISOString(),
+        config,
+        org_email: signupData.email,
+        org_password: signupData.password,
+      });
+
+      // Create admin user in miniAuth and sign in
+      const signupRes = await miniAuth.signUp(signupData.email, signupData.password);
+      if (signupRes.error) throw signupRes.error;
+
+      if (signupRes.data?.user) {
+        await miniAuth.updateUserOrgId(signupRes.data.user.id, orgId);
+      }
+
+      // Sign in immediately
+      await miniAuth.signIn(signupData.email, signupData.password);
+
+      playSuccess();
+      toast({ title: 'Welcome to Finance Solver!', description: `${signupData.firmName} is ready.` });
+    } catch (err: any) {
+      playError();
+      toast({ title: 'Setup Failed', description: err.message || 'Something went wrong', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalSetupSteps = SETUP_STEPS.length;
+  const overallStep = step === 'choose' ? 0 : step === 'login' ? 1 : step === 'signup-creds' ? 1 : 2;
 
   return (
     <div className="min-h-screen flex items-center justify-center auth-bg relative overflow-hidden">
@@ -192,52 +202,40 @@ export default function Auth() {
             <p className="text-[10px] font-semibold tracking-[0.25em] text-muted-foreground">F.S.001 • Enterprise ERP</p>
           </div>
 
-          {/* Step indicator */}
-          {stepNumber > 0 && (
-            <div className="flex items-center gap-1.5 justify-center">
-              {[1, 2, 3, 4].map(s => (
-                <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${
-                  s <= stepNumber ? 'w-8 bg-primary' : 'w-4 bg-muted'
-                }`} />
-              ))}
-              <span className="text-[10px] text-muted-foreground ml-2">Step {stepNumber}/4</span>
-            </div>
-          )}
-
-          {/* ── Step 1: Choose ── */}
+          {/* ── Choose ── */}
           {step === 'choose' && (
             <div className="space-y-4">
               <p className="text-sm font-medium text-foreground/80 text-center">Get started with Finance Solver</p>
               <Button
                 className="w-full h-12 gap-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-primary to-primary-glow hover:opacity-90 shadow-lg"
-                onClick={() => { setStep('main-login'); playClick(); }}
+                onClick={() => { setStep('login'); playClick(); }}
               >
                 <LogIn className="w-4 h-4" /> Sign In
               </Button>
               <Button
                 variant="outline"
                 className="w-full h-12 gap-2.5 rounded-xl text-sm font-semibold border-primary/30 hover:bg-primary/5"
-                onClick={() => { setStep('main-signup'); playClick(); }}
+                onClick={() => { setStep('signup-creds'); playClick(); }}
               >
                 <UserPlus className="w-4 h-4" /> Create New Account
               </Button>
             </div>
           )}
 
-          {/* ── Step 2a: Main Login ── */}
-          {step === 'main-login' && (
+          {/* ── Login ── */}
+          {step === 'login' && (
             <>
               <div className="flex items-center gap-2">
                 <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors">
                   <ArrowLeft className="w-4 h-4" />
                 </button>
-                <p className="text-sm font-medium text-foreground/80">{stepTitle[step]}</p>
+                <p className="text-sm font-medium text-foreground/80">Sign In to Your Account</p>
               </div>
-              <form onSubmit={handleMainLogin} className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Email</label>
                   <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus
-                    placeholder="your@email.com" className="h-11 rounded-xl bg-background/50 border-border/60" />
+                    placeholder="admin@firm.com" className="h-11 rounded-xl bg-background/50 border-border/60" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Password</label>
@@ -257,25 +255,30 @@ export default function Auth() {
               </form>
               <p className="text-center text-xs text-muted-foreground">
                 Don't have an account?{' '}
-                <button onClick={() => { setStep('main-signup'); resetFields(); playClick(); }} className="text-primary hover:underline font-semibold">Sign Up</button>
+                <button onClick={() => { setStep('signup-creds'); resetFields(); playClick(); }} className="text-primary hover:underline font-semibold">Sign Up</button>
               </p>
             </>
           )}
 
-          {/* ── Step 2b: Main Signup ── */}
-          {step === 'main-signup' && (
+          {/* ── Signup: Firm + Credentials ── */}
+          {step === 'signup-creds' && (
             <>
               <div className="flex items-center gap-2">
                 <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors">
                   <ArrowLeft className="w-4 h-4" />
                 </button>
-                <p className="text-sm font-medium text-foreground/80">{stepTitle[step]}</p>
+                <p className="text-sm font-medium text-foreground/80">Create Your Account</p>
               </div>
-              <form onSubmit={handleMainSignup} className="space-y-4">
+              <form onSubmit={handleSignupCreds} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Email</label>
-                  <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus
-                    placeholder="your@email.com" className="h-11 rounded-xl bg-background/50 border-border/60" />
+                  <label className="text-xs font-medium text-muted-foreground">Firm / Organization Name</label>
+                  <Input value={firmName} onChange={e => setFirmName(e.target.value)} required autoFocus
+                    placeholder="e.g. Kota Associates" className="h-11 rounded-xl bg-background/50 border-border/60" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Admin Email</label>
+                  <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                    placeholder="admin@firm.com" className="h-11 rounded-xl bg-background/50 border-border/60" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Password</label>
@@ -315,137 +318,97 @@ export default function Auth() {
                   )}
                 </div>
                 <Button type="submit" className="w-full h-11 gap-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-primary to-primary-glow hover:opacity-90 shadow-lg"
-                  disabled={loading || !pwCheck.valid}>
-                  <UserPlus className="w-4 h-4" /> {loading ? 'Creating...' : 'Create Account'}
+                  disabled={!pwCheck.valid || firmName.trim().length < 2}>
+                  <Building2 className="w-4 h-4" /> Continue Setup
                 </Button>
               </form>
               <p className="text-center text-xs text-muted-foreground">
                 Already have an account?{' '}
-                <button onClick={() => { setStep('main-login'); resetFields(); playClick(); }} className="text-primary hover:underline font-semibold">Sign In</button>
+                <button onClick={() => { setStep('login'); resetFields(); playClick(); }} className="text-primary hover:underline font-semibold">Sign In</button>
               </p>
             </>
           )}
 
-          {/* ── Step 3: Org Selection ── */}
-          {step === 'org-select' && (
+          {/* ── Signup: Basic Setup Questions ── */}
+          {step === 'signup-setup' && currentSetupStep && (
             <>
               <div className="flex items-center gap-2">
                 <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors">
                   <ArrowLeft className="w-4 h-4" />
                 </button>
                 <div>
-                  <p className="text-sm font-medium text-foreground/80">Select Organization</p>
-                  <p className="text-[10px] text-muted-foreground">Logged in as {mainUser?.email}</p>
+                  <p className="text-sm font-medium text-foreground/80">Basic Setup</p>
+                  <p className="text-[10px] text-muted-foreground">Step {setupStep + 1} of {totalSetupSteps} — {signupData?.firmName}</p>
                 </div>
               </div>
 
-              {linkedOrgs.length > 0 ? (
-                <div className="space-y-2">
-                  {linkedOrgs.map(org => (
-                    <button key={org.id} onClick={() => handleOrgSelect(org)}
-                      className="w-full flex items-center gap-3 p-4 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all text-left">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <Building2 className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{org.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{org.config?.org_type || 'Organization'}</p>
-                      </div>
-                      <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 space-y-3">
-                  <Building2 className="w-10 h-10 mx-auto text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">No organizations linked to your account yet.</p>
-                  <p className="text-xs text-muted-foreground/60">Create a new organization to get started.</p>
-                </div>
-              )}
+              {/* Progress bar */}
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+                  style={{ width: `${((setupStep + 1) / totalSetupSteps) * 100}%` }}
+                />
+              </div>
 
-              <Button variant="outline" className="w-full h-11 gap-2 rounded-xl text-sm font-semibold border-primary/30 hover:bg-primary/5"
-                onClick={() => { playClick(); setStep('org-setup'); }}>
-                <Building2 className="w-4 h-4" /> Create New Organization
-              </Button>
-            </>
-          )}
+              <div className="space-y-4">
+                <p className="text-sm font-medium text-foreground">{currentSetupStep.label}</p>
+                <div className="grid gap-2">
+                  {currentSetupStep.options.map(opt => {
+                    const selected = isMulti
+                      ? ((answers[currentSetupStep.key] as string[]) || []).includes(opt.value)
+                      : answers[currentSetupStep.key] === opt.value;
 
-          {/* ── Step 4: Org Credentials ── */}
-          {step === 'org-auth' && (
-            <>
-              <div className="flex items-center gap-2">
-                <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors">
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                <div>
-                  <p className="text-sm font-medium text-foreground/80">Organization Authentication</p>
-                  <p className="text-[10px] text-muted-foreground">{selectedOrg?.name}</p>
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleSelect(opt.value)}
+                        className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
+                          selected
+                            ? 'border-primary bg-primary/10 shadow-sm'
+                            : 'border-border/60 hover:border-primary/40 hover:bg-muted/50'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                          selected ? 'border-primary bg-primary' : 'border-muted-foreground/30'
+                        }`}>
+                          {selected && <Check className="w-3 h-3 text-primary-foreground" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{opt.label}</p>
+                          {opt.desc && <p className="text-[11px] text-muted-foreground">{opt.desc}</p>}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                <KeyRound className="w-4 h-4 text-primary shrink-0" />
-                <p className="text-[11px] text-foreground/70">Enter the organization credentials to verify your access.</p>
-              </div>
-
-              <form onSubmit={handleOrgAuth} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Organization Email</label>
-                  <Input type="email" value={orgEmail} onChange={e => setOrgEmail(e.target.value)} required autoFocus
-                    placeholder="org@company.com" className="h-11 rounded-xl bg-background/50 border-border/60" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Organization Password</label>
-                  <Input type="password" value={orgPassword} onChange={e => setOrgPassword(e.target.value)} required
-                    placeholder="••••••••" className="h-11 rounded-xl bg-background/50 border-border/60" />
-                </div>
-                <Button type="submit" className="w-full h-11 gap-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-primary to-primary-glow hover:opacity-90 shadow-lg">
-                  <Shield className="w-4 h-4" /> Verify Access
+              {/* Nav buttons */}
+              <div className="flex items-center justify-between pt-2">
+                <Button variant="ghost" size="sm" onClick={goBack} className="gap-1">
+                  <ArrowLeft className="w-4 h-4" /> Back
                 </Button>
-              </form>
-            </>
-          )}
 
-          {/* ── Step 5: Org User Login ── */}
-          {step === 'org-user-login' && (
-            <>
-              <div className="flex items-center gap-2">
-                <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors">
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                <div>
-                  <p className="text-sm font-medium text-foreground/80">User Login</p>
-                  <p className="text-[10px] text-muted-foreground">{selectedOrg?.name} • Enter your role-based credentials</p>
-                </div>
+                {setupStep < totalSetupSteps - 1 ? (
+                  <Button
+                    size="sm"
+                    onClick={() => { setSetupStep(setupStep + 1); playClick(); }}
+                    disabled={!canProceedSetup()}
+                    className="gap-1 bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
+                  >
+                    Next
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={handleFinishSetup}
+                    disabled={!canProceedSetup() || loading}
+                    className="gap-1.5 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                  >
+                    {loading ? 'Setting up...' : '🚀 Launch ERP'}
+                  </Button>
+                )}
               </div>
-
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20">
-                <Users className="w-4 h-4 text-accent shrink-0" />
-                <p className="text-[11px] text-foreground/70">Login with your assigned user account (Admin, Handler, etc.)</p>
-              </div>
-
-              <form onSubmit={handleOrgUserLogin} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">User Email</label>
-                  <Input type="email" value={orgUserEmail} onChange={e => setOrgUserEmail(e.target.value)} required autoFocus
-                    placeholder="admin@company.com" className="h-11 rounded-xl bg-background/50 border-border/60" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">User Password</label>
-                  <div className="relative">
-                    <Input type={showPw ? 'text' : 'password'} value={orgUserPassword} onChange={e => setOrgUserPassword(e.target.value)}
-                      required placeholder="••••••••" className="h-11 rounded-xl bg-background/50 border-border/60 pr-10" />
-                    <button type="button" onClick={() => setShowPw(!showPw)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <Button type="submit" className="w-full h-11 gap-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-primary to-primary-glow hover:opacity-90 shadow-lg"
-                  disabled={loading}>
-                  <LogIn className="w-4 h-4" /> {loading ? 'Signing in...' : 'Enter ERP System'}
-                </Button>
-              </form>
             </>
           )}
 
@@ -453,7 +416,7 @@ export default function Auth() {
           <div className="border-t border-border/40 pt-3 space-y-1">
             <div className="flex items-center gap-1.5 justify-center">
               <Shield className="w-3.5 h-3.5 text-primary" />
-              <p className="text-[10px] text-muted-foreground font-semibold">3-Level Secure Access</p>
+              <p className="text-[10px] text-muted-foreground font-semibold">Secure Local Access</p>
             </div>
             <p className="text-[9px] text-muted-foreground/40 text-center">
               Finance Solver — F.S.001 • Created by Kota Associates
