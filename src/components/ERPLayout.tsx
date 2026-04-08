@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, UserCog, Database, IndianRupee,
   Receipt, FileText, ClipboardCheck, Settings, ChevronLeft,
   ChevronRight, TrendingUp, FileSpreadsheet, LogOut, Shield, User,
-  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Search, Plus, ChevronsUpDown, Building2, Wallet, BarChart3, Eye
+  CheckSquare, Lock, ScrollText, Calendar, ShieldAlert, Brain, Download, Search, Plus, Wallet, BarChart3, Eye
 } from 'lucide-react';
 import { useERP } from '@/lib/erp-store';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,10 +25,9 @@ const ICON_MAP: Record<string, React.ElementType> = {
 
 export default function ERPLayout() {
   const [collapsed, setCollapsed] = useState(false);
-  const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
   const { currentFY, setCurrentFY, refreshData } = useERP();
   const { signOut, user, isAdmin, isViewer, handlerCode, role } = useAuth();
-  const { org, orgs, enabledModules, setActiveOrg } = useOrg();
+  const { org, enabledModules } = useOrg();
   const navigate = useNavigate();
   const [globalSearch, setGlobalSearch] = useState('');
   const [showNewFY, setShowNewFY] = useState(false);
@@ -61,68 +60,21 @@ export default function ERPLayout() {
     }));
 
   const orgName = org?.name || 'Finance Solver';
-  const hasMultipleOrgs = orgs.length > 1;
-
-  const handleSwitchOrg = (orgId: string) => {
-    setActiveOrg(orgId);
-    setShowOrgSwitcher(false);
-    playClick();
-    toast({ title: 'Organization switched', description: `Switched to ${orgs.find(o => o.id === orgId)?.name}` });
-    navigate('/control-panel');
-    window.location.reload();
-  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <aside className={`erp-sidebar flex flex-col transition-all duration-300 ease-out ${collapsed ? 'w-[72px]' : 'w-64'} shrink-0 relative z-20`}>
-        {/* Logo + Org Switcher */}
+        {/* Logo */}
         <div className="border-b border-sidebar-border/50">
-          <div
-            className={`h-16 flex items-center gap-3 px-3 ${hasMultipleOrgs && !collapsed ? 'cursor-pointer hover:bg-sidebar-accent/30' : ''} transition-colors`}
-            onClick={() => { if (hasMultipleOrgs && !collapsed) { setShowOrgSwitcher(!showOrgSwitcher); playClick(); } }}
-          >
+          <div className="h-16 flex items-center gap-3 px-3">
             <img src={kaLogo} alt="Kota Associates" className="w-10 h-10 rounded-xl shrink-0 shadow-lg object-contain" />
             {!collapsed && (
               <div className="flex-1 min-w-0 animate-fade-in">
-                <div className="flex items-center gap-1">
-                  <div className="text-xs font-bold tracking-wider gradient-text truncate">{orgName.toUpperCase()}</div>
-                  {hasMultipleOrgs && <ChevronsUpDown className="w-3 h-3 text-sidebar-foreground/30 shrink-0" />}
-                </div>
+                <div className="text-xs font-bold tracking-wider gradient-text truncate">{orgName.toUpperCase()}</div>
                 <div className="text-[9px] text-sidebar-foreground/40 font-mono">Finance Solver — F.S.001</div>
               </div>
             )}
           </div>
-
-          {/* Org Switcher Dropdown */}
-          {showOrgSwitcher && !collapsed && (
-            <div className="px-2 pb-2 animate-fade-in">
-              <div className="rounded-lg border border-sidebar-border/50 bg-sidebar-accent/50 overflow-hidden">
-                <p className="text-[9px] text-sidebar-foreground/40 px-3 py-1.5 font-semibold uppercase tracking-wider">Switch Organization</p>
-                {orgs.map(o => (
-                  <button
-                    key={o.id}
-                    onClick={() => handleSwitchOrg(o.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-sidebar-accent/80 ${
-                      o.id === org?.id ? 'bg-primary/10' : ''
-                    }`}
-                  >
-                    <Building2 className="w-3.5 h-3.5 text-sidebar-foreground/40 shrink-0" />
-                    <div className="min-w-0">
-                      <p className={`text-xs font-medium truncate ${o.id === org?.id ? 'text-primary' : 'text-sidebar-foreground/80'}`}>
-                        {o.name}
-                      </p>
-                      <p className="text-[9px] text-sidebar-foreground/30 truncate capitalize">
-                        {o.config?.org_type?.replace('_', ' ')} • {o.config?.team_size}
-                      </p>
-                    </div>
-                    {o.id === org?.id && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Role & Credentials */}
@@ -139,11 +91,6 @@ export default function ERPLayout() {
               </span>
             </div>
             <p className="text-[9px] text-sidebar-foreground/30 truncate mt-1 font-mono">{user?.email}</p>
-            {org && (
-              <p className="text-[8px] text-sidebar-foreground/20 truncate mt-0.5 font-mono">
-                Org: {org.slug} • {org.config?.org_type?.replace('_', ' ')}
-              </p>
-            )}
           </div>
         )}
 

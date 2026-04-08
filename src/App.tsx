@@ -14,7 +14,6 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { OrgProvider, useOrg } from "@/hooks/useOrg";
 import ERPLayout from "@/components/ERPLayout";
 import Auth from "./pages/Auth";
-import OrgSetup from "./pages/OrgSetup";
 import ControlPanel from "./pages/ControlPanel";
 import HandlerMaster from "./pages/HandlerMaster";
 import ClientMaster from "./pages/ClientMaster";
@@ -58,20 +57,6 @@ function AdminRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function AdminOrViewerRoute({ children }: { children: ReactNode }) {
-  const { isAdmin, isViewer, loading, role } = useAuth();
-  if (loading) return null;
-  if (!isAdmin && !isViewer) return <Navigate to={getDefaultPath(role)} replace />;
-  return <>{children}</>;
-}
-
-function NonViewerRoute({ children }: { children: ReactNode }) {
-  const { isViewer, loading, role } = useAuth();
-  if (loading) return null;
-  if (isViewer) return <Navigate to={getDefaultPath(role)} replace />;
-  return <>{children}</>;
-}
-
 function ModuleRoute({ moduleId, children, adminOnly, nonViewer, adminOrViewer }: { 
   moduleId: string; children: ReactNode; adminOnly?: boolean; nonViewer?: boolean; adminOrViewer?: boolean 
 }) {
@@ -94,7 +79,6 @@ function DailyReportRunner() {
 
 function ProtectedRoutes() {
   const { user, loading, role } = useAuth();
-  const { isOrgSetupDone } = useOrg();
   const [showLoginSummary, setShowLoginSummary] = useState(true);
 
   if (loading)
@@ -108,10 +92,6 @@ function ProtectedRoutes() {
     );
 
   if (!user) return <Navigate to="/auth" replace />;
-
-  if (!isOrgSetupDone) {
-    return <OrgSetup />;
-  }
 
   if (!role)
     return (
@@ -139,7 +119,6 @@ function ProtectedRoutes() {
       </div>
     );
 
-  // Show login summary with finance stats for 2 seconds
   if (showLoginSummary) {
     return <LoginSummary onComplete={() => setShowLoginSummary(false)} />;
   }
