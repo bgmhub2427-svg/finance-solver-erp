@@ -38,7 +38,6 @@ import ExpenseManager from "./pages/ExpenseManager";
 import FirmCommandCenter from "./pages/FirmCommandCenter";
 import ClientIntelligence from "./pages/ClientIntelligence";
 import NotFound from "./pages/NotFound";
-import { miniAuth } from "@/lib/mini-supabase";
 
 const queryClient = new QueryClient();
 
@@ -93,24 +92,14 @@ function ProtectedRoutes() {
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  if (!role)
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-muted-foreground">Verifying access...</p>
-        </div>
-      </div>
-    );
-
-  if (role === "none")
+  if (!role || role === "none")
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3 p-8">
           <p className="text-lg font-semibold">Access Denied</p>
           <p className="text-sm text-muted-foreground">Your account has no assigned role. Contact the admin.</p>
           <button
-            onClick={() => { miniAuth.signOut(); }}
+            onClick={() => { useAuth().signOut(); }}
             className="text-sm text-primary hover:underline"
           >
             Sign Out

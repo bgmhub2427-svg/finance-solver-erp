@@ -1,37 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { miniAuth } from '@/lib/mini-supabase';
-import { LogIn, UserPlus, Shield, Eye, EyeOff, Check, X, ArrowLeft, Building2 } from 'lucide-react';
+import { LogIn, UserPlus, Eye, EyeOff, Check, X, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { playClick, playSuccess, playError } from '@/lib/sound-engine';
-import { validatePassword, deriveModules, defaultRoleLimits, SETUP_STEPS, ROLE_LABELS, type OrgConfig, type RoleLimits } from '@/lib/org-types';
+import { validatePassword, deriveModules, defaultRoleLimits, type OrgConfig } from '@/lib/org-types';
 import { useOrg } from '@/hooks/useOrg';
 import kaLogo from '@/assets/kota-associates-logo.png';
 
-type AuthStep = 'choose' | 'login' | 'signup-creds' | 'signup-setup';
-
-interface SignupData {
-  firmName: string;
-  email: string;
-  password: string;
-}
+type AuthStep = 'choose' | 'login' | 'signup';
 
 export default function Auth() {
   const [step, setStep] = useState<AuthStep>('choose');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firmName, setFirmName] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [signupData, setSignupData] = useState<SignupData | null>(null);
-  const [firmName, setFirmName] = useState('');
-  // Setup wizard state
-  const [setupStep, setSetupStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const { toast } = useToast();
-  const { createOrg } = useOrg();
+  const { createOrg, orgs } = useOrg();
 
-  // One-time reset: clear all demo/test data so user starts fresh
+  // One-time reset for fresh start
   useEffect(() => {
     const RESET_FLAG = 'erp_fresh_reset_v4';
     if (!localStorage.getItem(RESET_FLAG)) {
@@ -56,14 +46,11 @@ export default function Auth() {
 
   const goBack = () => {
     playClick();
-    if (step === 'login' || step === 'signup-creds') { setStep('choose'); resetFields(); }
-    else if (step === 'signup-setup') {
-      if (setupStep > 0) setSetupStep(setupStep - 1);
-      else setStep('signup-creds');
-    }
+    setStep('choose');
+    resetFields();
   };
 
-  // Direct login → miniAuth
+  // Direct login → Dashboard
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -80,8 +67,8 @@ export default function Auth() {
     }
   };
 
-  // Signup Step 1: Validate creds and move to setup
-  const handleSignupCreds = (e: React.FormEvent) => {
+  // Single-step signup: create firm + admin user + auto-login
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pwCheck.valid) {
       playError();
@@ -93,77 +80,40 @@ export default function Auth() {
       toast({ title: 'Invalid Firm Name', description: 'Firm name must be at least 2 characters.', variant: 'destructive' });
       return;
     }
-    playClick();
-    setSignupData({ firmName: firmName.trim(), email: email.trim(), password });
-    setStep('signup-setup');
-    setSetupStep(0);
-  };
 
-  // Setup wizard answer handling
-  const currentSetupStep = SETUP_STEPS[setupStep];
-  const isMulti = (currentSetupStep as any)?.multi === true;
-
-  const handleSelect = (value: string) => {
-    if (!currentSetupStep) return;
-    playClick();
-    if (isMulti) {
-      const current = (answers[currentSetupStep.key] as string[]) || [];
-      const updated = current.includes(value)
-        ? current.filter(v => v !== value)
-        : [...current, value];
-      setAnswers({ ...answers, [currentSetupStep.key]: updated });
-    } else {
-      setAnswers({ ...answers, [currentSetupStep.key]: value });
-    }
-  };
-
-  const canProceedSetup = () => {
-    if (!currentSetupStep) return false;
-    const val = answers[currentSetupStep.key];
-    if (isMulti) return Array.isArray(val) && val.length > 0;
-    return !!val;
-  };
-
-  // Final: create org + admin user + sign in
-  const handleFinishSetup = async () => {
-    if (!signupData) return;
     setLoading(true);
     try {
+      const orgId = crypto.randomUUID?.() || `org-${Date.now()}`;
+      const slug = firmName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
+      const trimmedEmail = email.trim();
+
+      // Default config for single-org setup
       const config: OrgConfig = {
-        org_type: (answers.org_type as string) || 'other',
-        team_size: (answers.team_size as string) || '1-5',
-        billing_model: (answers.billing_model as string) || 'monthly',
-        services: (answers.services as string[]) || [],
+        org_type: 'ca_firm',
+        team_size: '1-5',
+        billing_model: 'monthly',
+        services: ['gst', 'itr', 'accounting'],
         roles: ['admin', 'manager', 'handler', 'viewer', 'fee_collector'],
-        payment_structure: (answers.payment_structure as string) || 'variable',
-        enabled_modules: deriveModules({
-          org_type: answers.org_type as string,
-          team_size: answers.team_size as string,
-          billing_model: answers.billing_model as string,
-          services: answers.services as string[],
-          payment_structure: answers.payment_structure as string,
-        } as Partial<OrgConfig>),
-        role_limits: defaultRoleLimits((answers.team_size as string) || '1-5'),
+        payment_structure: 'variable',
+        enabled_modules: deriveModules({ org_type: 'ca_firm' } as Partial<OrgConfig>),
+        role_limits: defaultRoleLimits('1-5'),
       };
 
-      const slug = signupData.firmName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
-      const orgId = crypto.randomUUID?.() || `org-${Date.now()}`;
-
-      // Create organization
+      // Create organization record
       createOrg({
         id: orgId,
-        name: signupData.firmName,
+        name: firmName.trim(),
         slug,
         owner_id: orgId,
-        owner_email: signupData.email,
+        owner_email: trimmedEmail,
         created_at: new Date().toISOString(),
         config,
-        org_email: signupData.email,
-        org_password: signupData.password,
+        org_email: trimmedEmail,
+        org_password: password,
       });
 
-      // Create admin user in miniAuth and sign in
-      const signupRes = await miniAuth.signUp(signupData.email, signupData.password);
+      // Create admin user + auto sign-in
+      const signupRes = await miniAuth.signUp(trimmedEmail, password);
       if (signupRes.error) throw signupRes.error;
 
       if (signupRes.data?.user) {
@@ -171,20 +121,17 @@ export default function Auth() {
       }
 
       // Sign in immediately
-      await miniAuth.signIn(signupData.email, signupData.password);
+      await miniAuth.signIn(trimmedEmail, password);
 
       playSuccess();
-      toast({ title: 'Welcome to Finance Solver!', description: `${signupData.firmName} is ready.` });
+      toast({ title: 'Welcome to Finance Solver!', description: `${firmName.trim()} is ready.` });
     } catch (err: any) {
       playError();
-      toast({ title: 'Setup Failed', description: err.message || 'Something went wrong', variant: 'destructive' });
+      toast({ title: 'Signup Failed', description: err.message || 'Something went wrong', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
-
-  const totalSetupSteps = SETUP_STEPS.length;
-  const overallStep = step === 'choose' ? 0 : step === 'login' ? 1 : step === 'signup-creds' ? 1 : 2;
 
   return (
     <div className="min-h-screen flex items-center justify-center auth-bg relative overflow-hidden">
@@ -215,7 +162,7 @@ export default function Auth() {
               <Button
                 variant="outline"
                 className="w-full h-12 gap-2.5 rounded-xl text-sm font-semibold border-primary/30 hover:bg-primary/5"
-                onClick={() => { setStep('signup-creds'); playClick(); }}
+                onClick={() => { setStep('signup'); playClick(); }}
               >
                 <UserPlus className="w-4 h-4" /> Create New Account
               </Button>
@@ -255,13 +202,13 @@ export default function Auth() {
               </form>
               <p className="text-center text-xs text-muted-foreground">
                 Don't have an account?{' '}
-                <button onClick={() => { setStep('signup-creds'); resetFields(); playClick(); }} className="text-primary hover:underline font-semibold">Sign Up</button>
+                <button onClick={() => { setStep('signup'); resetFields(); playClick(); }} className="text-primary hover:underline font-semibold">Sign Up</button>
               </p>
             </>
           )}
 
-          {/* ── Signup: Firm + Credentials ── */}
-          {step === 'signup-creds' && (
+          {/* ── Signup: Single Step ── */}
+          {step === 'signup' && (
             <>
               <div className="flex items-center gap-2">
                 <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -269,9 +216,9 @@ export default function Auth() {
                 </button>
                 <p className="text-sm font-medium text-foreground/80">Create Your Account</p>
               </div>
-              <form onSubmit={handleSignupCreds} className="space-y-4">
+              <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Firm / Organization Name</label>
+                  <label className="text-xs font-medium text-muted-foreground">Firm Name</label>
                   <Input value={firmName} onChange={e => setFirmName(e.target.value)} required autoFocus
                     placeholder="e.g. Kota Associates" className="h-11 rounded-xl bg-background/50 border-border/60" />
                 </div>
@@ -318,8 +265,8 @@ export default function Auth() {
                   )}
                 </div>
                 <Button type="submit" className="w-full h-11 gap-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-primary to-primary-glow hover:opacity-90 shadow-lg"
-                  disabled={!pwCheck.valid || firmName.trim().length < 2}>
-                  <Building2 className="w-4 h-4" /> Continue Setup
+                  disabled={loading || !pwCheck.valid || firmName.trim().length < 2}>
+                  <UserPlus className="w-4 h-4" /> {loading ? 'Creating Account...' : 'Create Account & Enter ERP'}
                 </Button>
               </form>
               <p className="text-center text-xs text-muted-foreground">
@@ -329,98 +276,9 @@ export default function Auth() {
             </>
           )}
 
-          {/* ── Signup: Basic Setup Questions ── */}
-          {step === 'signup-setup' && currentSetupStep && (
-            <>
-              <div className="flex items-center gap-2">
-                <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors">
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                <div>
-                  <p className="text-sm font-medium text-foreground/80">Basic Setup</p>
-                  <p className="text-[10px] text-muted-foreground">Step {setupStep + 1} of {totalSetupSteps} — {signupData?.firmName}</p>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
-                  style={{ width: `${((setupStep + 1) / totalSetupSteps) * 100}%` }}
-                />
-              </div>
-
-              <div className="space-y-4">
-                <p className="text-sm font-medium text-foreground">{currentSetupStep.label}</p>
-                <div className="grid gap-2">
-                  {currentSetupStep.options.map(opt => {
-                    const selected = isMulti
-                      ? ((answers[currentSetupStep.key] as string[]) || []).includes(opt.value)
-                      : answers[currentSetupStep.key] === opt.value;
-
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => handleSelect(opt.value)}
-                        className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
-                          selected
-                            ? 'border-primary bg-primary/10 shadow-sm'
-                            : 'border-border/60 hover:border-primary/40 hover:bg-muted/50'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                          selected ? 'border-primary bg-primary' : 'border-muted-foreground/30'
-                        }`}>
-                          {selected && <Check className="w-3 h-3 text-primary-foreground" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{opt.label}</p>
-                          {opt.desc && <p className="text-[11px] text-muted-foreground">{opt.desc}</p>}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Nav buttons */}
-              <div className="flex items-center justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={goBack} className="gap-1">
-                  <ArrowLeft className="w-4 h-4" /> Back
-                </Button>
-
-                {setupStep < totalSetupSteps - 1 ? (
-                  <Button
-                    size="sm"
-                    onClick={() => { setSetupStep(setupStep + 1); playClick(); }}
-                    disabled={!canProceedSetup()}
-                    className="gap-1 bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
-                  >
-                    Next
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={handleFinishSetup}
-                    disabled={!canProceedSetup() || loading}
-                    className="gap-1.5 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-                  >
-                    {loading ? 'Setting up...' : '🚀 Launch ERP'}
-                  </Button>
-                )}
-              </div>
-            </>
-          )}
-
           {/* Footer */}
-          <div className="border-t border-border/40 pt-3 space-y-1">
-            <div className="flex items-center gap-1.5 justify-center">
-              <Shield className="w-3.5 h-3.5 text-primary" />
-              <p className="text-[10px] text-muted-foreground font-semibold">Secure Local Access</p>
-            </div>
-            <p className="text-[9px] text-muted-foreground/40 text-center">
-              Finance Solver — F.S.001 • Created by Kota Associates
-            </p>
+          <div className="text-center pt-2 border-t border-border/30">
+            <p className="text-[10px] text-muted-foreground">Finance Solver — F.S.001 • Created by Kota Associates</p>
           </div>
         </div>
       </div>
